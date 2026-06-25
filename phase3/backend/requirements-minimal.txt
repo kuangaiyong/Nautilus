@@ -35,6 +35,10 @@ python-dotenv>=1.0.0
 # Blockchain
 web3>=6.0.0
 eth-account>=0.10.0
+mnemonic>=0.20
+
+# LLM (私有大模型，OpenAI 兼容协议)
+openai>=1.40.0
 
 # Rate Limiting
 slowapi>=0.1.9

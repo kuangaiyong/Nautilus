@@ -62,8 +62,8 @@ class CoordinationResult:
 async def _llm_call(system: str, user: str, max_tokens: int = 2048) -> str:
     """Make an LLM call. Uses Anthropic by default, falls back to LLMClient."""
     try:
-        import anthropic
-        client = anthropic.Anthropic()
+        from services.llm_gateway import get_anthropic_compatible_client
+        client = get_anthropic_compatible_client()
         response = await asyncio.to_thread(
             lambda: client.messages.create(
                 model=LLM_MODEL,

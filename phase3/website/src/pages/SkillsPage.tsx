@@ -152,7 +152,7 @@ export default function SkillsPage() {
                       </div>
                       <div className="flex items-center justify-between mt-auto">
                         <div>
-                          {s.price_usdc > 0 && <span className="text-sm font-bold text-white">{s.price_usdc} USDC</span>}
+                          {s.price_usdc > 0 && <span className="text-sm font-bold text-white">{s.price_usdc} 华币</span>}
                           {s.price_nau > 0 && <span className="text-xs text-purple-300 ml-1">/ {s.price_nau} NAU</span>}
                           {s.price_usdc === 0 && s.price_nau === 0 && <span className="text-sm font-bold text-green-400">免费</span>}
                         </div>

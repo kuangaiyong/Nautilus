@@ -11,18 +11,25 @@ from blockchain.web3_config import get_web3_config, get_w3
 
 logger = logging.getLogger(__name__)
 
-# USDC/USDT have 6 decimals
-TOKEN_DECIMALS = 6
+# 结算币精度：Base 上 USDC/USDT=6，内网私有链华币(HUA)=18。
+# 从 web3_config 按当前网络动态读取，避免硬编码导致金额换算错误。
+def _token_decimals() -> int:
+    try:
+        return get_web3_config().token_decimals
+    except Exception:
+        return 6
 
 
-def to_token_units(amount: float) -> int:
-    """Convert human-readable amount (e.g. 10.5) to token units (10500000)."""
-    return int(amount * 10**TOKEN_DECIMALS)
+def to_token_units(amount: float, decimals: Optional[int] = None) -> int:
+    """Convert human-readable amount to token units（按结算币精度）。"""
+    d = decimals if decimals is not None else _token_decimals()
+    return int(amount * 10**d)
 
 
-def from_token_units(raw: int) -> float:
-    """Convert token units to human-readable amount."""
-    return raw / 10**TOKEN_DECIMALS
+def from_token_units(raw: int, decimals: Optional[int] = None) -> float:
+    """Convert token units to human-readable amount。"""
+    d = decimals if decimals is not None else _token_decimals()
+    return raw / 10**d
 
 
 class BlockchainService:
@@ -40,7 +47,7 @@ class BlockchainService:
         input_data: str,
         expected_output: str,
         reward_amount: float,
-        token: str = "usdc",
+        token: str = "hua",
         task_type: int = 1,  # DATA
         timeout: int = 3600,
     ) -> Optional[str]:
@@ -161,7 +168,7 @@ class BlockchainService:
 
     # --- Reward Operations ---
 
-    def get_reward_balance(self, agent_address: str, token: str = "usdc") -> float:
+    def get_reward_balance(self, agent_address: str, token: str = "hua") -> float:
         """Get agent's accumulated reward balance in RewardContract."""
         rc = self.config.reward_contract
         if not rc:
@@ -181,7 +188,7 @@ class BlockchainService:
             logger.error(f"Failed to get reward balance: {e}")
             return 0.0
 
-    async def withdraw_reward(self, token: str = "usdc") -> Optional[str]:
+    async def withdraw_reward(self, token: str = "hua") -> Optional[str]:
         """Withdraw all accumulated rewards for a token."""
         rc = self.config.reward_contract
         if not rc:

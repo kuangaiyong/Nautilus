@@ -209,12 +209,13 @@ class WalletIssuerService:
             _zero_bytes(pk)
 
     async def get_balance(self, address: str) -> dict:
-        """Query ETH, USDC, and USDT balances."""
+        """Query ETH, HUA (华币), USDC, and USDT balances."""
         from blockchain.web3_config import get_web3_config
         config = get_web3_config()
         return {
             "address": address.lower(),
             "eth": config.get_eth_balance(address),
+            "hua": config.get_hua_balance(address),
             "usdc": config.get_usdc_balance(address),
             "usdt": config.get_usdt_balance(address),
         }

@@ -46,7 +46,7 @@ describe('TaskCard', () => {
   it('should render reward amount', () => {
     render(<TaskCard task={mockTask} onViewDetails={mockOnViewDetails} />)
 
-    expect(screen.getByText('1000 USDT')).toBeInTheDocument()
+    expect(screen.getByText('1000 华币')).toBeInTheDocument()
   })
 
   it('should render applicants count', () => {

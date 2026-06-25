@@ -98,15 +98,15 @@ export default function AgentSurvivalPage() {
       <div className="grid grid-cols-4 gap-4 mb-6">
         <div className="bg-white rounded-lg shadow p-4">
           <p className="text-sm text-gray-500 mb-1">余额</p>
-          <p className="text-2xl font-bold text-gray-900">{data.balance} USDC</p>
+          <p className="text-2xl font-bold text-gray-900">{data.balance} 华币</p>
         </div>
         <div className="bg-white rounded-lg shadow p-4">
           <p className="text-sm text-gray-500 mb-1">收入</p>
-          <p className="text-2xl font-bold text-green-600">{data.income} USDC</p>
+          <p className="text-2xl font-bold text-green-600">{data.income} 华币</p>
         </div>
         <div className="bg-white rounded-lg shadow p-4">
           <p className="text-sm text-gray-500 mb-1">支出</p>
-          <p className="text-2xl font-bold text-red-600">{data.cost} USDC</p>
+          <p className="text-2xl font-bold text-red-600">{data.cost} 华币</p>
         </div>
         <div className="bg-white rounded-lg shadow p-4">
           <p className="text-sm text-gray-500 mb-1">ROI</p>

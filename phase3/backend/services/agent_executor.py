@@ -25,8 +25,6 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
-import anthropic
-
 from services.pricing import TASK_PRICES, get_price_list, get_task_price
 
 logger = logging.getLogger(__name__)
@@ -143,6 +141,24 @@ class AgentRegistry:
                 model="MiniMax-M2.7",
                 capabilities=["simple_qa", "status_check", "greeting"],
             ))
+
+        # 内网私有大模型：若已配置 LLM_BASE_URL，确保核心角色齐备（统一走网关）
+        if os.getenv("LLM_BASE_URL"):
+            _private_model = os.getenv("LLM_MODEL", "default")
+            for _role, _aid, _name in [
+                ("coordinator", "agent-coordinator", "协调者"),
+                ("executor", "agent-executor", "执行者"),
+                ("auditor", "agent-auditor", "审计者"),
+                ("customer_service", "agent-service", "客服"),
+            ]:
+                if not self.get_by_role(_role):
+                    self.register(AgentProfile(
+                        agent_id=_aid, name=_name, role=_role,
+                        provider="private",
+                        api_key=os.getenv("LLM_API_KEY", "not-needed"),
+                        base_url=os.getenv("LLM_BASE_URL"),
+                        model=_private_model, capabilities=[],
+                    ))
 
         logger.info(
             "AgentRegistry: %d agents (%s)",
@@ -831,11 +847,10 @@ class AgentExecutor:
         logger.info("AgentExecutor initialized with %d agents", len(self.registry.agents))
 
     def _init_clients(self):
-        for agent_id, agent in self.registry.agents.items():
-            kwargs = {"api_key": agent.api_key}
-            if agent.base_url:
-                kwargs["base_url"] = agent.base_url
-            self._clients[agent_id] = anthropic.Anthropic(**kwargs)
+        from services.llm_gateway import get_anthropic_compatible_client
+        for agent_id in self.registry.agents:
+            # 统一走私有大模型网关（OpenAI 兼容）
+            self._clients[agent_id] = get_anthropic_compatible_client()
 
     def get_client(self, agent_id: str):
         return self._clients.get(agent_id)

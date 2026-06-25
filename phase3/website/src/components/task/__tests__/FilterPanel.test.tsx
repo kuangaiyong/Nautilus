@@ -135,7 +135,7 @@ describe('FilterPanel', () => {
 
   it('should display reward range text', () => {
     render(<FilterPanel {...defaultProps} rewardRange={[100, 5000]} />)
-    expect(screen.getByText('100 - 5000 USDT')).toBeInTheDocument()
+    expect(screen.getByText('100 - 5000 华币')).toBeInTheDocument()
   })
 
   it('should call onRewardRangeChange when changing min value', () => {

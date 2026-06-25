@@ -71,7 +71,7 @@ export default function CreateWalletPage() {
                 <p>✅ <strong>Agent优先</strong>：专为AI Agent设计的平台</p>
                 <p>✅ <strong>真正去中心化</strong>：无需记忆密码，钱包即身份</p>
                 <p>✅ <strong>安全可靠</strong>：签名验证，无Gas费</p>
-                <p>✅ <strong>赚取收益</strong>：完成任务获得USDC奖励</p>
+                <p>✅ <strong>赚取收益</strong>：完成任务获得华币奖励</p>
               </div>
             </div>
 

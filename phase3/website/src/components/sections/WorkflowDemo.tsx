@@ -25,7 +25,7 @@ export default function WorkflowDemo() {
     },
     {
       title: '4. 获得奖励',
-      description: '任务验证通过，自动发放USDC奖励',
+      description: '任务验证通过，自动发放华币奖励',
       icon: '💰',
       color: 'from-green-500 to-emerald-500'
     }

@@ -1,0 +1,139 @@
+# =============================================================================
+# Nautilus 内网私有化编排（方案 A：geth POA 私链）
+# -----------------------------------------------------------------------------
+# 纯局域网/单机运行，不依赖任何公网资源。
+#
+# 启动顺序（首次部署）：
+#   1) 启基础设施：
+#        docker compose -f docker-compose.private.yml --env-file .env.private up -d geth postgres redis
+#   2) 宿主机部署合约（连 geth）：
+#        cd contracts && npm ci
+#        PRIVATE_RPC=http://127.0.0.1:8545 DEPLOYER_PRIVATE_KEY=<signer> \
+#          npx hardhat run scripts/deploy_private.js --network privatechain
+#        # 将 deployed_private.json 中的地址填入 .env.private
+#   3) 启后端：
+#        docker compose -f docker-compose.private.yml --env-file .env.private up -d backend
+#   4) （可选）前端：需先补全 website/package.json 后
+#        docker compose -f docker-compose.private.yml --env-file .env.private --profile frontend up -d frontend
+# =============================================================================
+
+services:
+  # --- 以太坊私链 (geth Clique POA) ---------------------------------------
+  geth:
+    image: ethereum/client-go:v1.13.15
+    container_name: nautilus-geth
+    restart: unless-stopped
+    entrypoint: ["sh", "/privatechain/entrypoint.sh"]
+    environment:
+      CHAIN_ID: "13370"
+      SIGNER_PRIVATE_KEY: "${SIGNER_PRIVATE_KEY:-}"
+    ports:
+      - "8545:8545"
+      - "8546:8546"
+    volumes:
+      - ./privatechain:/privatechain:ro
+      - nautilus-geth-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "geth attach --exec 'eth.blockNumber' http://localhost:8545 >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - nautilus-private
+
+  # --- PostgreSQL ----------------------------------------------------------
+  postgres:
+    image: postgres:15
+    container_name: nautilus-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: nautilus_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-nautilus2024}
+      POSTGRES_DB: nautilus_production
+      POSTGRES_INITDB_ARGS: "-E UTF8"
+    volumes:
+      - nautilus-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nautilus_user -d nautilus_production"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - nautilus-private
+
+  # --- Redis ---------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: nautilus-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - nautilus-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - nautilus-private
+
+  # --- 后端 (FastAPI) ------------------------------------------------------
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: nautilus-backend
+    restart: unless-stopped
+    env_file:
+      - .env.private
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+    ports:
+      - "8000:8000"
+    depends_on:
+      geth:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health').read()\" || exit 1"]
+      interval: 30s
+      timeout: 10s
+      start_period: 40s
+      retries: 3
+    networks:
+      - nautilus-private
+
+  # --- 前端 (nginx 静态) ---------------------------------------------------
+  # 注意：开源裁剪后 website/package.json 缺失，需先补全前端依赖清单再启用。
+  # 通过 --profile frontend 显式启用。
+  frontend:
+    build:
+      context: ./website
+      dockerfile: Dockerfile
+    container_name: nautilus-frontend
+    restart: unless-stopped
+    profiles: ["frontend"]
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+    networks:
+      - nautilus-private
+
+volumes:
+  nautilus-geth-data:
+    driver: local
+  nautilus-postgres-data:
+    driver: local
+  nautilus-redis-data:
+    driver: local
+
+networks:
+  nautilus-private:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.0.0/16

@@ -394,7 +394,7 @@ export default function AgentDetailPage() {
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-yellow-500">{'★'.repeat(Math.round(s.avg_rating))}{'☆'.repeat(5-Math.round(s.avg_rating))}</span>
                   <span className="text-sm font-bold text-gray-900">
-                    {s.price_usdc > 0 ? `${s.price_usdc} USDC` : 'Free'}
+                    {s.price_usdc > 0 ? `${s.price_usdc} 华币` : 'Free'}
                   </span>
                 </div>
               </div>

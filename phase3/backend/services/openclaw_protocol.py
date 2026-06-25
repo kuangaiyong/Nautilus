@@ -433,18 +433,9 @@ class OpenClawProtocol:
 
         # Natural language task → LLM analysis
         try:
-            import anthropic as _anthropic
-            import os as _os
+            from services.llm_gateway import get_anthropic_compatible_client
 
-            api_key = (
-                _os.getenv("ANTHROPIC_API_KEY")
-                or _os.getenv("CLAUDE_API_KEY")
-                or _os.getenv("CLAUDE_WORKER_KEY")
-            )
-            if not api_key:
-                raise ValueError("No API key available")
-
-            client = _anthropic.Anthropic(api_key=api_key)
+            client = get_anthropic_compatible_client()
             prompt = (
                 f"你是一个AI Agent，正在完成平台分配给你的任务。\n"
                 f"任务类型: {task.task_type}\n"
@@ -489,16 +480,7 @@ class OpenClawProtocol:
         Runs as a background task; failures are logged and silently ignored.
         """
         try:
-            import anthropic as _anthropic
-            import os as _os
-
-            api_key = (
-                _os.getenv("ANTHROPIC_API_KEY")
-                or _os.getenv("CLAUDE_API_KEY")
-                or _os.getenv("CLAUDE_WORKER_KEY")
-            )
-            if not api_key:
-                return
+            from services.llm_gateway import get_anthropic_compatible_client
 
             output_preview = str(result.get("output", ""))[:400]
             prompt = (
@@ -512,7 +494,7 @@ class OpenClawProtocol:
                 f'"confidence_boost": 1}}'
             )
 
-            client = _anthropic.Anthropic(api_key=api_key)
+            client = get_anthropic_compatible_client()
             resp = client.messages.create(
                 model="claude-haiku-4-5-20251001",
                 max_tokens=128,

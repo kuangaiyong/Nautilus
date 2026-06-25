@@ -18,6 +18,13 @@ module.exports = {
   },
   networks: {
     hardhat: {},
+    privatechain: {
+      url: process.env.PRIVATE_RPC || "http://127.0.0.1:8545",
+      chainId: Number(process.env.PRIVATE_CHAIN_ID || 13370),
+      accounts: process.env.DEPLOYER_PRIVATE_KEY
+        ? [process.env.DEPLOYER_PRIVATE_KEY]
+        : [],
+    },
     baseSepolia: {
       url: process.env.BASE_SEPOLIA_RPC || "https://sepolia.base.org",
       chainId: 84532,

@@ -214,50 +214,17 @@ async def _analyse_with_claude(context_text: str) -> Dict[str, Any]:
     """
     raw = None
 
-    # 1. Try Claude proxy (cheaper, no credit limit)
-    proxy_key = os.getenv("CLAUDE_PROXY_API_KEY", "")
-    proxy_url = os.getenv("CLAUDE_PROXY_BASE_URL", "")
-    if proxy_key and proxy_url:
-        try:
-            import anthropic
-            client = anthropic.Anthropic(api_key=proxy_key, base_url=proxy_url)
-            response = client.messages.create(
-                model=ANTHROPIC_MODEL,
-                max_tokens=1500,
-                system=ANALYSIS_SYSTEM_PROMPT,
-                messages=[{"role": "user", "content": context_text}],
-            )
-            raw = response.content[0].text
-        except Exception as e:
-            logger.warning("Claude proxy analysis failed: %s", e)
-
-    # 2. Try Anthropic direct
-    if raw is None:
-        try:
-            import anthropic
-            client = anthropic.Anthropic()
-            response = client.messages.create(
-                model=ANTHROPIC_MODEL,
-                max_tokens=1500,
-                system=ANALYSIS_SYSTEM_PROMPT,
-                messages=[{"role": "user", "content": context_text}],
-            )
-            raw = response.content[0].text
-        except Exception as e:
-            logger.warning("Anthropic direct analysis failed: %s", e)
-
-    # 3. Fallback to unified LLM client
-    if raw is None:
-        try:
-            from agent_engine.llm.client import get_llm_client
-            import asyncio
-            client = get_llm_client()
-            raw = await asyncio.to_thread(
-                client.chat, context_text, ANALYSIS_SYSTEM_PROMPT, 1500
-            )
-        except Exception as e:
-            logger.error("All LLM providers failed: %s", e)
-            return None
+    # 统一走私有大模型网关（OpenAI 兼容）
+    try:
+        from agent_engine.llm.client import get_llm_client
+        import asyncio
+        client = get_llm_client()
+        raw = await asyncio.to_thread(
+            client.chat, context_text, ANALYSIS_SYSTEM_PROMPT, 1500
+        )
+    except Exception as e:
+        logger.error("LLM analysis failed: %s", e)
+        return None
 
     # Parse JSON from response
     try:

@@ -1,11 +1,11 @@
 """
-LLM Client - Unified interface for MiniMax M2.7 via Anthropic SDK.
+LLM Client — 统一接口，内部走 services.llm_gateway（公司私有大模型，OpenAI 兼容）。
 """
 import os
 import logging
 from typing import Optional
 
-from anthropic import Anthropic
+from services.llm_gateway import get_anthropic_compatible_client
 
 logger = logging.getLogger(__name__)
 
@@ -16,8 +16,7 @@ _client: Optional["LLMClient"] = None
 class LLMClient:
     """Wrapper around Anthropic SDK configured for MiniMax M2.7."""
 
-    DEFAULT_MODEL = "MiniMax-M2.7"
-    DEFAULT_BASE_URL = "https://api.minimaxi.com/anthropic"
+    DEFAULT_MODEL = "default"
 
     def __init__(
         self,
@@ -26,17 +25,9 @@ class LLMClient:
         model: Optional[str] = None,
     ):
         self.model = model or os.getenv("LLM_MODEL", self.DEFAULT_MODEL)
-        resolved_key = api_key or os.getenv("MINIMAX_API_KEY") or os.getenv("ANTHROPIC_API_KEY")
-        # Prioritize MINIMAX_BASE_URL; ignore ANTHROPIC_BASE_URL (may point to anthropic.com)
-        resolved_url = os.getenv("MINIMAX_BASE_URL") or base_url or self.DEFAULT_BASE_URL
-
-        if not resolved_key:
-            raise ValueError(
-                "No API key found. Set MINIMAX_API_KEY or ANTHROPIC_API_KEY env var."
-            )
-
-        self.client = Anthropic(api_key=resolved_key, base_url=resolved_url)
-        logger.info(f"LLMClient initialized: model={self.model}, base_url={resolved_url}")
+        # 统一走私有大模型网关（OpenAI 兼容）；api_key/base_url 由 llm_gateway 管理。
+        self.client = get_anthropic_compatible_client()
+        logger.info("LLMClient initialized via llm_gateway, model=%s", self.model)
 
     def chat(
         self,

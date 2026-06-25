@@ -3,6 +3,21 @@ import type { NetworkConfig } from './types';
 
 // Network configurations
 export const NETWORKS: Record<string, NetworkConfig> = {
+  // 内网私有链（geth Clique POA）。托管钱包模式下前端主要通过后端 API 操作，
+  // 此配置用于可选的 MetaMask 直连私链场景。
+  privatechain: {
+    chainId: 13370,
+    chainName: 'Nautilus 私有链',
+    nativeCurrency: {
+      name: 'Ether',
+      symbol: 'ETH',
+      decimals: 18,
+    },
+    rpcUrls: [
+      (import.meta.env.VITE_PRIVATE_RPC as string) || 'http://127.0.0.1:8545',
+    ],
+    blockExplorerUrls: [],
+  },
   sepolia: {
     chainId: 11155111,
     chainName: 'Sepolia Testnet',
@@ -34,8 +49,8 @@ export const NETWORKS: Record<string, NetworkConfig> = {
   },
 };
 
-// Default network
-export const DEFAULT_NETWORK = 'sepolia';
+// Default network（内网部署默认私有链，可经 VITE_NETWORK 覆盖）
+export const DEFAULT_NETWORK = (import.meta.env.VITE_NETWORK as string) || 'privatechain';
 
 class Web3Provider {
   private provider: ethers.BrowserProvider | null = null;

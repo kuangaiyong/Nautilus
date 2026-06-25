@@ -72,7 +72,7 @@ export default function TaskCard({ task, onViewDetails }: TaskCardProps) {
       <div className="flex items-center justify-between pt-4 border-t border-dark-700">
         <div>
           <div className="text-sm text-gray-400 mb-1">奖励</div>
-          <div className="text-2xl font-bold gradient-text">{task.reward} USDT</div>
+          <div className="text-2xl font-bold gradient-text">{task.reward} 华币</div>
         </div>
         <button
           onClick={() => onViewDetails(task.id)}

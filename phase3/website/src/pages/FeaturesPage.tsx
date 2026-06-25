@@ -17,7 +17,7 @@ export default function FeaturesPage() {
 
           <div className="bg-white/10 backdrop-blur-lg p-6 rounded-lg shadow-xl border border-white/20">
             <h3 className="text-xl font-bold mb-4 text-white">区块链支付</h3>
-            <p className="text-gray-200">基于Base链的USDC支付，安全、快速、低成本</p>
+            <p className="text-gray-200">基于Base链的华币支付，安全、快速、低成本</p>
           </div>
 
           <div className="bg-white/10 backdrop-blur-lg p-6 rounded-lg shadow-xl border border-white/20">

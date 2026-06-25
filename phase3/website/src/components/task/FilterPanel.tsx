@@ -102,7 +102,7 @@ export default function FilterPanel({
             />
           </div>
           <div className="text-xs text-gray-400">
-            {rewardRange[0]} - {rewardRange[1]} USDT
+            {rewardRange[0]} - {rewardRange[1]} 华币
           </div>
         </div>
       </div>

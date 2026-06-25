@@ -17,6 +17,16 @@ logger = logging.getLogger(__name__)
 BLOCKCHAIN_NETWORK = os.getenv("BLOCKCHAIN_NETWORK", "base-sepolia")
 
 NETWORK_CONFIG = {
+    # 内网私有链（geth Clique POA）。结算币为华币(HUA)，18 位精度。
+    # usdc/usdt 字段同时指向华币地址，以兼容历史上以 "usdc" 为默认 token 的调用路径。
+    "privatechain": {
+        "rpc_url": os.getenv("PRIVATE_RPC", "http://geth:8545"),
+        "chain_id": int(os.getenv("PRIVATE_CHAIN_ID", "13370")),
+        "usdc_address": os.getenv("HUA_TOKEN_ADDRESS", ""),
+        "usdt_address": "",
+        "hua_address": os.getenv("HUA_TOKEN_ADDRESS", ""),
+        "token_decimals": 18,
+    },
     "base-sepolia": {
         "rpc_url": os.getenv("BASE_SEPOLIA_RPC", "https://sepolia.base.org"),
         "chain_id": 84532,
@@ -72,6 +82,9 @@ class Web3Config:
         self.chain_id = net["chain_id"]
         self.usdc_address = net["usdc_address"]
         self.usdt_address = net["usdt_address"]
+        # 结算币精度（USDC/USDT=6，华币=18）。用于金额↔最小单位换算。
+        self.token_decimals = net.get("token_decimals", 6)
+        self.hua_address = net.get("hua_address", "")
 
         # Connect with validation
         rpc_url = net["rpc_url"]
@@ -101,6 +114,8 @@ class Web3Config:
         # Load ERC20 token contracts
         self.usdc_contract = self._load_contract("IERC20", self.usdc_address) if self.usdc_address else None
         self.usdt_contract = self._load_contract("IERC20", self.usdt_address) if self.usdt_address else None
+        # 华币结算合约（内网私有链）
+        self.hua_contract = self._load_contract("IERC20", self.hua_address) if self.hua_address else None
 
         # NAU token contract (platform PoUW token)
         self.nau_contract = self._load_contract("NautilusToken", NAU_TOKEN_ADDRESS) if NAU_TOKEN_ADDRESS else None
@@ -141,7 +156,7 @@ class Web3Config:
         raw = self.usdc_contract.functions.balanceOf(
             Web3.to_checksum_address(address)
         ).call()
-        return raw / 1e6
+        return raw / 10 ** self.token_decimals
 
     def get_usdt_balance(self, address: str) -> float:
         """Get USDT balance (6 decimals)."""
@@ -150,22 +165,37 @@ class Web3Config:
         raw = self.usdt_contract.functions.balanceOf(
             Web3.to_checksum_address(address)
         ).call()
-        return raw / 1e6
+        return raw / 10 ** self.token_decimals
+
+    def get_hua_balance(self, address: str) -> float:
+        """Get HUA balance (华币, 私有链 18 decimals)."""
+        if not self.hua_contract:
+            return 0.0
+        raw = self.hua_contract.functions.balanceOf(
+            Web3.to_checksum_address(address)
+        ).call()
+        return raw / 10 ** self.token_decimals
 
     def get_token_contract(self, token: str):
-        """Get ERC20 contract by token name ('usdc' or 'usdt')."""
-        if token.lower() == "usdc":
+        """Get ERC20 contract by token name ('usdc', 'usdt' or 'hua')."""
+        t = token.lower()
+        if t == "usdc":
             return self.usdc_contract
-        elif token.lower() == "usdt":
+        elif t == "usdt":
             return self.usdt_contract
+        elif t == "hua":
+            return self.hua_contract
         return None
 
     def get_token_address(self, token: str) -> str:
         """Get token contract address by name."""
-        if token.lower() == "usdc":
+        t = token.lower()
+        if t == "usdc":
             return self.usdc_address
-        elif token.lower() == "usdt":
+        elif t == "usdt":
             return self.usdt_address
+        elif t == "hua":
+            return self.hua_address
         return ""
 
     def is_connected(self) -> bool:

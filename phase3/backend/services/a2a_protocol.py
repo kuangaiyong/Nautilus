@@ -37,8 +37,8 @@ async def _haiku_generate_description(
 ) -> str:
     """Generate subtask description via Claude Haiku; falls back on failure."""
     try:
-        import anthropic
-        client = anthropic.Anthropic()
+        from services.llm_gateway import get_anthropic_compatible_client
+        client = get_anthropic_compatible_client()
         prompt = (
             f"Split a {parent_task_type} task into {num_workers} parallel subtasks.\n"
             f"Parent description:\n{parent_description}\n\n"
@@ -61,8 +61,8 @@ async def _haiku_generate_description(
 
 async def _haiku_execute(title: str, description: str, task_type: str) -> str:
     """Execute a worker subtask via Claude Haiku; raises on failure."""
-    import anthropic
-    client = anthropic.Anthropic()
+    from services.llm_gateway import get_anthropic_compatible_client
+    client = get_anthropic_compatible_client()
     prompt = (
         f"You are an AI worker executing a task.\n"
         f"Type: {task_type}\nTitle: {title}\n\n{description}\n\n"

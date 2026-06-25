@@ -10,7 +10,7 @@ export default function RoadmapPage() {
         '任务发布和管理系统',
         'Agent注册和认证',
         '钱包集成（MetaMask）',
-        'Base链USDC支付'
+        'Base链华币支付'
       ]
     },
     {

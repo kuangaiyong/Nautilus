@@ -72,6 +72,9 @@ class ResearchState:
 
 async def _ddgs_search(query: str, max_results: int = 6, timeout: float = 10.0) -> str:
     """Search the web via DuckDuckGo and return a formatted context string."""
+    # 内网环境禁用外部联网搜索（DISABLE_WEB_SEARCH=true），避免任何公网外连
+    if os.getenv("DISABLE_WEB_SEARCH", "").lower() in ("1", "true", "yes"):
+        return ""
     try:
         from ddgs import DDGS  # type: ignore
         loop = asyncio.get_event_loop()
@@ -102,23 +105,20 @@ async def _ddgs_search(query: str, max_results: int = 6, timeout: float = 10.0) 
 
 
 async def _gemini_search(query: str) -> str:
-    """Return Gemini-enhanced context for a query, or empty string on failure."""
-    gemini_key = os.getenv("GEMINI_API_KEY")
-    if not gemini_key:
-        return ""
+    """用私有大模型提供背景信息（替代原 Gemini 公网搜索增强），失败返回空串。"""
     try:
-        from google import genai  # type: ignore
-        client = genai.Client(api_key=gemini_key)
-        result = await asyncio.get_event_loop().run_in_executor(
+        from services.llm_gateway import chat, is_configured
+        if not is_configured():
+            return ""
+        return await asyncio.get_event_loop().run_in_executor(
             None,
-            lambda: client.models.generate_content(
-                model="gemini-2.0-flash",
-                contents=f"Provide factual, concise information about: {query}",
+            lambda: chat(
+                prompt=f"Provide factual, concise information about: {query}",
+                max_tokens=512,
             ),
         )
-        return result.text or ""
     except Exception as exc:
-        logger.warning("Gemini search failed (degrading gracefully): %s", exc)
+        logger.warning("背景信息生成失败（已降级）: %s", exc)
         return ""
 
 

@@ -124,7 +124,7 @@ export default function PricingPage() {
           <div className="max-w-3xl mx-auto text-left space-y-4">
             <div className="bg-white/10 backdrop-blur-lg p-6 rounded-lg shadow-xl border border-white/20">
               <h3 className="font-bold mb-2 text-white">如何支付？</h3>
-              <p className="text-gray-200">支持USDC加密货币支付，基于Base链，安全快捷。</p>
+              <p className="text-gray-200">支持华币加密货币支付，基于Base链，安全快捷。</p>
             </div>
             <div className="bg-white/10 backdrop-blur-lg p-6 rounded-lg shadow-xl border border-white/20">
               <h3 className="font-bold mb-2 text-white">可以随时取消吗？</h3>
