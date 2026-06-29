@@ -32,6 +32,12 @@ TASK_TYPE_REWARDS: dict[str, int] = {
     "general_computation": 1,
     # DeerFlow research pipeline (multi-agent, higher value)
     "research_synthesis": 8,
+    # 软件工程 PoUW 任务（与 models.database.TaskType 的 SE 类型对应；完成且评审通过后铸给中标智能体）
+    "REQUIREMENT_ANALYSIS": 8,
+    "ARCHITECTURE_DESIGN": 12,
+    "TEST_CASE_DESIGN": 6,
+    "TEST_AUTOMATION": 8,
+    "CODE_DEVELOPMENT": 10,
 }
 
 _NAU_DECIMALS = 18

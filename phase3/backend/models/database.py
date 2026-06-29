@@ -39,6 +39,12 @@ class TaskType(enum.Enum):
     DESIGN = "DESIGN"
     WRITING = "WRITING"
     OTHER = "OTHER"
+    # 软件工程任务类型（PoUW 市场：自主竞价 + 3 专家评审 + 完成铸 NAU）
+    REQUIREMENT_ANALYSIS = "REQUIREMENT_ANALYSIS"   # 需求分析
+    ARCHITECTURE_DESIGN = "ARCHITECTURE_DESIGN"     # 技术方案/架构设计
+    TEST_CASE_DESIGN = "TEST_CASE_DESIGN"           # 测试用例设计
+    TEST_AUTOMATION = "TEST_AUTOMATION"             # 自动化测试脚本生成
+    CODE_DEVELOPMENT = "CODE_DEVELOPMENT"           # 代码开发
 
 
 class TaskStatus(enum.Enum):
@@ -418,3 +424,43 @@ class AgentCapabilityStat(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     __table_args__ = (UniqueConstraint("agent_id", "task_type", name="uq_agent_task_type"),)
+
+
+class DmasTaskBid(Base):
+    """常规(DMAS)软件工程任务的竞价记录（区别于学术任务的 task_bids）。
+
+    自主竞价时，对口专长的智能体对 OPEN 状态的 SE 任务投标；到竞价窗结束后按
+    weight（声誉 + 专长匹配，见 services/se_pouw.bid_weight）择高中标。
+    """
+    __tablename__ = "dmas_task_bids"
+
+    id = Column(Integer, primary_key=True, index=True)
+    task_id = Column(Integer, ForeignKey("tasks.id"), nullable=False, index=True)
+    agent_id = Column(Integer, ForeignKey("agents.agent_id"), nullable=False, index=True)
+    bid_nau = Column(Float, nullable=False, default=0.0)   # 报价(NAU)，预留
+    weight = Column(Float, nullable=False, default=0.0)    # 中标加权分（声誉 + 专长匹配）
+    status = Column(String(20), nullable=False, default="pending", index=True)  # pending / won / lost
+    message = Column(Text, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+    __table_args__ = (UniqueConstraint("task_id", "agent_id", name="uq_dmas_bid_task_agent"),)
+
+
+class TaskReview(Base):
+    """软件工程任务的专家评审打分（每任务 N 条，N=se_pouw.NUM_REVIEWERS）。
+
+    评审通过(聚合均分≥阈值)才允许完成并发放华币奖励 + 铸 NAU + 加声誉。
+    """
+    __tablename__ = "task_reviews"
+
+    id = Column(Integer, primary_key=True, index=True)
+    task_id = Column(Integer, ForeignKey("tasks.id"), nullable=False, index=True)
+    reviewer_agent_id = Column(Integer, ForeignKey("agents.agent_id"), nullable=False, index=True)
+    score = Column(Float, nullable=False)            # 综合分 0~5
+    correctness = Column(Float, nullable=True)       # 维度分：正确性
+    completeness = Column(Float, nullable=True)      # 维度分：完整性
+    standards = Column(Float, nullable=True)         # 维度分：规范性
+    comment = Column(Text, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+    __table_args__ = (UniqueConstraint("task_id", "reviewer_agent_id", name="uq_review_task_reviewer"),)

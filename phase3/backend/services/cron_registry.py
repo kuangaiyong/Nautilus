@@ -92,6 +92,12 @@ CRON_JOBS = [
         "description": "对已分配的 platform_meta 任务自动生成并提交改进提案（闭环第五步）",
         "budget_seconds": 180,  # RAID-3 needs ~60-120s for 3 parallel LLM calls + judge
     },
+    {
+        "id": "se_marketplace",
+        "trigger": IntervalTrigger(minutes=1),
+        "description": "软件工程任务市场：自主智能体加权竞价 + 竞价窗到点择优中标派单",
+        "budget_seconds": 20,
+    },
 ]
 
 
@@ -158,6 +164,24 @@ def _make_anomaly_detection_fn():
                 db.close()
         except Exception as e:
             logger.debug("anomaly alert failed: %s", e)
+    return _fn
+
+
+def _make_se_marketplace_fn(db_factory):
+    """软件工程任务市场：自主智能体加权竞价 + 竞价窗到点择优中标派单。"""
+    async def _fn():
+        try:
+            from services.se_pouw_flow import auto_bid_open_se_tasks, award_due_se_tasks
+            db = db_factory()
+            try:
+                auto_bid_open_se_tasks(db)
+                awarded = award_due_se_tasks(db)
+                if awarded:
+                    logger.info("se_marketplace: awarded %d SE task(s)", awarded)
+            finally:
+                db.close()
+        except Exception as e:
+            logger.error("se_marketplace failed: %s", e)
     return _fn
 
 
@@ -527,6 +551,7 @@ def start_cron_registry(db_factory) -> None:
         "flush_pending_nau": _make_flush_nau_fn(db_factory),
         "auto_accept_bids": _make_auto_accept_bids_fn(db_factory),
         "auto_submit_proposals": _make_auto_submit_proposals_fn(db_factory),
+        "se_marketplace": _make_se_marketplace_fn(db_factory),
     }
 
     for spec in CRON_JOBS:

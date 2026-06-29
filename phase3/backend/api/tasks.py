@@ -433,11 +433,15 @@ async def accept_task(
     except Exception as e:
         logger.error(f"Blockchain integration error for task accept {task.task_id}: {e}")
 
-    # Phase 3: Auto-execute task using agent engine
+    # Phase 3: Auto-execute task using agent engine.
+    # 软件工程(SE)任务由中标智能体自行交付（提交真实成果供 3 专家评审），不投入平台
+    # 自动执行器——后者对 SE 类型会反复 planning/executing 形成循环并争用 LLM 网关，
+    # 拖慢/污染评审。普通任务保持原有自动执行行为。
     try:
-        queue_id = await submit_task_to_queue(task.id, agent.agent_id, db)
-        logger.info(f"Task {task.id} submitted to execution queue: {queue_id}")
-
+        from services import se_pouw
+        if not se_pouw.is_se_task(task.task_type):
+            queue_id = await submit_task_to_queue(task.id, agent.agent_id, db)
+            logger.info(f"Task {task.id} submitted to execution queue: {queue_id}")
         # Update agent current tasks count
         agent.current_tasks += 1
         db.commit()
@@ -712,6 +716,21 @@ async def complete_task(
             detail="Task has no assigned agent to reward"
         )
 
+    # 软件工程任务：结算前先经 3 个对口专长智能体 LLM 评审。聚合均分达阈值才放行结算/
+    # 铸 NAU/加声誉；未达阈值则判 FAILED、不付款。普通任务不受影响。
+    from services import se_pouw
+    if se_pouw.is_se_task(task.task_type):
+        from services.se_pouw_flow import run_expert_reviews
+        _rev = run_expert_reviews(db, task.id)
+        if not _rev["passed"]:
+            task.status = TaskStatus.FAILED
+            task.verified_at = datetime.now(timezone.utc)
+            db.commit()
+            db.refresh(task)
+            logger.info(f"SE task {task_id} REJECTED by expert review: avg={_rev['avg']}/5 (n={_rev['n']})")
+            return task
+        logger.info(f"SE task {task_id} PASSED expert review: avg={_rev['avg']}/5 (n={_rev['n']})")
+
     # Reviewer (publisher) approved the submission. Settle the reward on-chain
     # BEFORE marking the task completed, so a payment failure leaves the task
     # reviewable rather than silently "completed but unpaid". The publisher's
@@ -809,6 +828,16 @@ async def complete_task(
             db.rollback()
         except Exception:
             pass
+
+    # 软件工程任务：华币结算 + 评审通过后，给中标智能体铸 NAU（PoUW 奖励，链上）
+    if se_pouw.is_se_task(task.task_type):
+        try:
+            from services.se_pouw_flow import mint_nau_for_task
+            _nau_tx = await mint_nau_for_task(db, task)
+            if _nau_tx:
+                logger.info(f"SE task {task_id} NAU minted to agent: {_nau_tx}")
+        except Exception as e:
+            logger.warning(f"NAU mint failed for SE task {task_id}: {e}")
 
     # Store task memory and reflection
     try:

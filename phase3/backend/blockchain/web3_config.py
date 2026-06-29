@@ -94,6 +94,14 @@ class Web3Config:
                 f"(missing API key or empty). Check BASE_SEPOLIA_RPC or SEPOLIA_RPC_URL env vars."
             )
         self.w3 = Web3(Web3.HTTPProvider(rpc_url))
+        # 私有链是 geth Clique POA：区块头 extraData 为 97 字节（含签名），web3.py 默认按
+        # 32 字节校验会抛 "extraData is 97 bytes"。注入 POA 中间件后才能解析 POA 区块，
+        # 否则任何读区块的操作（如 NAU 铸造走 EIP-1559 取 baseFee 时拉最新区块）都会失败。
+        try:
+            from web3.middleware import ExtraDataToPOAMiddleware
+            self.w3.middleware_onion.inject(ExtraDataToPOAMiddleware, layer=0)
+        except Exception as _poa_exc:  # 公链模式无此问题，注入失败不致命
+            logger.debug(f"POA middleware not injected: {_poa_exc}")
         if self.w3.is_connected():
             actual_chain = self.w3.eth.chain_id
             if actual_chain != self.chain_id:

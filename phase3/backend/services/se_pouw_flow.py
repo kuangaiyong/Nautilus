@@ -1,0 +1,255 @@
+"""SE PoUW 流程编排（DB / 链 / LLM IO）。
+
+- P1 自主竞价：auto_bid_open_se_tasks / award_se_task / award_due_se_tasks
+- P2 完成铸 NAU：mint_nau_for_task
+- P3 三专家评审：run_expert_reviews / review_result
+
+纯配置与计算在 services/se_pouw.py。
+"""
+from __future__ import annotations
+
+import logging
+from datetime import datetime, timezone, timedelta
+from typing import Optional
+
+from sqlalchemy.orm import Session
+
+from services import se_pouw
+
+logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# P1 自主竞价
+# ---------------------------------------------------------------------------
+
+def auto_bid_open_se_tasks(db: Session) -> int:
+    """所有 autonomy_enabled 的智能体对 OPEN 的 SE 任务投标（幂等）。返回新增投标数。
+
+    每个自主智能体对每个未投过标的 OPEN SE 任务投标，加权分 = 声誉 + 专长匹配奖励
+    （见 se_pouw.bid_weight）；非自交易（发布者 != 智能体 owner）。
+    """
+    from models.database import Agent, Task, TaskStatus, DmasTaskBid
+
+    agents = db.query(Agent).filter(Agent.autonomy_enabled == True).all()  # noqa: E712
+    if not agents:
+        return 0
+    open_se = [t for t in db.query(Task).filter(Task.status == TaskStatus.OPEN).all()
+               if se_pouw.is_se_task(t.task_type)]
+    if not open_se:
+        return 0
+
+    created = 0
+    for task in open_se:
+        for agent in agents:
+            if task.publisher and agent.owner and task.publisher.lower() == agent.owner.lower():
+                continue  # 不对自己发布的任务投标
+            exists = db.query(DmasTaskBid).filter_by(task_id=task.id, agent_id=agent.agent_id).first()
+            if exists:
+                continue
+            db.add(DmasTaskBid(
+                task_id=task.id, agent_id=agent.agent_id,
+                weight=se_pouw.bid_weight(agent.reputation_score, task.task_type, agent.specialties),
+                status="pending",
+                message=f"auto-bid by agent {agent.agent_id}",
+                created_at=datetime.utcnow(),
+            ))
+            created += 1
+    if created:
+        db.commit()
+    logger.info("auto_bid_open_se_tasks: agents=%d open_se=%d new_bids=%d", len(agents), len(open_se), created)
+    return created
+
+
+def award_se_task(db: Session, task_id: int) -> Optional[int]:
+    """对一个 OPEN 的 SE 任务择优中标（最高 weight），派单。返回中标 agent_id 或 None。"""
+    from models.database import Agent, Task, TaskStatus, DmasTaskBid
+
+    task = db.query(Task).filter(Task.id == task_id).first()
+    if not task or task.status != TaskStatus.OPEN:
+        return None
+    bids = db.query(DmasTaskBid).filter(DmasTaskBid.task_id == task_id,
+                                        DmasTaskBid.status == "pending").all()
+    if not bids:
+        return None
+    winner = max(bids, key=lambda b: b.weight)
+    win_agent = db.query(Agent).filter(Agent.agent_id == winner.agent_id).first()
+    if not win_agent:
+        return None
+
+    # 派单：与 accept 端点一致地置 ACCEPTED + 指派
+    task.status = TaskStatus.ACCEPTED
+    task.agent = win_agent.owner
+    task.accepted_at = datetime.now(timezone.utc)
+    win_agent.current_tasks = (win_agent.current_tasks or 0) + 1
+    for b in bids:
+        b.status = "won" if b.id == winner.id else "lost"
+    db.commit()
+    logger.info("award_se_task: task=%s winner_agent=%s weight=%.1f (bids=%d)",
+                task_id, winner.agent_id, winner.weight, len(bids))
+    return winner.agent_id
+
+
+def award_due_se_tasks(db: Session) -> int:
+    """竞价窗已过且有投标的 OPEN SE 任务，批量择优中标。返回成交数。(供 cron 调用)"""
+    from models.database import Task, TaskStatus, DmasTaskBid
+
+    cutoff = datetime.utcnow() - timedelta(seconds=se_pouw.BID_WINDOW_SECONDS)
+    awarded = 0
+    open_se = [t for t in db.query(Task).filter(Task.status == TaskStatus.OPEN).all()
+               if se_pouw.is_se_task(t.task_type)]
+    for task in open_se:
+        if task.created_at and task.created_at > cutoff:
+            continue  # 竞价窗未到
+        has_bid = db.query(DmasTaskBid).filter(DmasTaskBid.task_id == task.id,
+                                               DmasTaskBid.status == "pending").first()
+        if has_bid and award_se_task(db, task.id):
+            awarded += 1
+    return awarded
+
+
+# ---------------------------------------------------------------------------
+# P3 三专家评审（LLM 自动评分）
+# ---------------------------------------------------------------------------
+
+_REVIEW_SYSTEM = (
+    "你是资深软件工程评审专家。请客观评估交付物对任务要求的满足程度，"
+    "从正确性、完整性、规范性三维度打分（每维 0-5），并给出综合分(0-5)。"
+    "只输出 JSON，不要多余文字。"
+)
+
+
+def select_reviewers(db: Session, task) -> list:
+    """选评审专家：排除执行者与发布者；对口专长优先、声誉降序，取前 NUM_REVIEWERS 个。"""
+    from models.database import Agent
+
+    cands = db.query(Agent).all()
+    out = []
+    for a in cands:
+        if not a.owner:
+            continue
+        if task.agent and a.owner.lower() == task.agent.lower():
+            continue  # 执行者本人不评审自己
+        if task.publisher and a.owner.lower() == task.publisher.lower():
+            continue  # 发布者不在 3 专家之列
+        out.append(a)
+    out.sort(key=lambda a: (1 if se_pouw.specialty_match(task.task_type, a.specialties) else 0,
+                            float(a.reputation_score or 50.0)), reverse=True)
+    return out[:se_pouw.NUM_REVIEWERS]
+
+
+def _review_one(info: dict) -> dict:
+    """单个评审用统一 LLM 网关对交付物打分。入参为纯值快照(线程安全，供并行调用)。
+
+    对模型间歇性空响应/格式问题做最多 3 次重试；空响应绝不当 0 分（否则会误判失败）。
+    3 次仍拿不到有效评分时，回落中性分 3.0（benefit-of-doubt，不因 LLM 抖动卡死流程）。
+    """
+    import json
+    import re
+    from services.llm_gateway import chat, is_configured
+
+    deliverable = (info.get("result") or "")[:6000]
+    prompt = (
+        f"任务类型: {info.get('task_type')}\n任务要求:\n{(info.get('description') or '')[:2000]}\n\n"
+        f"期望产出:\n{(info.get('expected_output') or '')[:1000]}\n\n"
+        f"智能体交付物:\n{deliverable or '(空)'}\n\n"
+        '严格只输出一行 JSON（不要解释、不要 markdown 代码块）：'
+        '{"correctness":0-5,"completeness":0-5,"standards":0-5,"score":0-5,"comment":"简评"}'
+    )
+    clamp = lambda v: max(0.0, min(5.0, float(v)))
+    last_err = None
+    for _ in range(3):
+        try:
+            if not is_configured():
+                raise RuntimeError("LLM 网关未配置")
+            raw = chat(prompt, system=_REVIEW_SYSTEM, max_tokens=500, temperature=0.2)
+            if not raw or not raw.strip():
+                last_err = "空响应"
+                continue
+            m = re.search(r"\{.*\}", raw, re.DOTALL)
+            if not m:
+                last_err = "未找到 JSON"
+                continue
+            data = json.loads(m.group(0))
+            if "score" not in data and "correctness" not in data:
+                last_err = "缺少评分字段"
+                continue
+            sc = clamp(data.get("score", data.get("correctness")))
+            return {
+                "score": sc,
+                "correctness": clamp(data.get("correctness", sc)),
+                "completeness": clamp(data.get("completeness", sc)),
+                "standards": clamp(data.get("standards", sc)),
+                "comment": str(data.get("comment", ""))[:500],
+            }
+        except Exception as exc:
+            last_err = str(exc)
+            continue
+    logger.warning("se review LLM 无有效评分(task=%s): %s -> 回落中性分", info.get("id"), last_err)
+    return {"score": 3.0, "correctness": 3.0, "completeness": 3.0, "standards": 3.0,
+            "comment": f"LLM 评审无有效输出，回落中性分（{last_err}）"}
+
+
+def run_expert_reviews(db: Session, task_id: int) -> dict:
+    """为 SE 任务选 3 评审、各自 LLM 打分并入库（幂等：已评够则直接返回聚合）。"""
+    from models.database import Task, TaskReview
+
+    task = db.query(Task).filter(Task.id == task_id).first()
+    if not task:
+        return {"avg": 0.0, "passed": False, "n": 0, "reviews": []}
+    done = {r.reviewer_agent_id for r in db.query(TaskReview).filter(TaskReview.task_id == task_id).all()}
+    if len(done) >= se_pouw.NUM_REVIEWERS:
+        return review_result(db, task_id)
+
+    reviewers = [r for r in select_reviewers(db, task) if r.agent_id not in done]
+    if reviewers:
+        # 纯值快照供线程并行 LLM 评审，避免跨线程访问 ORM 对象
+        info = {
+            "id": task.id,
+            "task_type": task.task_type.value if hasattr(task.task_type, "value") else str(task.task_type),
+            "description": task.description or "",
+            "expected_output": task.expected_output or "",
+            "result": getattr(task, "result", None) or "",
+        }
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor(max_workers=len(reviewers)) as ex:
+            scores = list(ex.map(lambda _r: _review_one(info), reviewers))  # 3 个评审并行
+        for reviewer, sc in zip(reviewers, scores):
+            db.add(TaskReview(
+                task_id=task_id, reviewer_agent_id=reviewer.agent_id,
+                score=sc["score"], correctness=sc["correctness"],
+                completeness=sc["completeness"], standards=sc["standards"],
+                comment=sc["comment"], created_at=datetime.utcnow(),
+            ))
+        db.commit()
+    res = review_result(db, task_id)
+    logger.info("run_expert_reviews: task=%s reviewers=%d avg=%.2f passed=%s",
+                task_id, res["n"], res["avg"], res["passed"])
+    return res
+
+
+def review_result(db: Session, task_id: int) -> dict:
+    """读取并聚合某任务的评审结果。"""
+    from models.database import TaskReview
+
+    rows = db.query(TaskReview).filter(TaskReview.task_id == task_id).all()
+    agg = se_pouw.aggregate_reviews([r.score for r in rows])
+    agg["reviews"] = [{"reviewer_agent_id": r.reviewer_agent_id, "score": r.score,
+                       "comment": r.comment} for r in rows]
+    return agg
+
+
+# ---------------------------------------------------------------------------
+# P2 完成铸 NAU
+# ---------------------------------------------------------------------------
+
+async def mint_nau_for_task(db: Session, task) -> Optional[str]:
+    """给中标智能体按任务类型铸 NAU（PoUW 奖励）。返回 tx_hash 或 None（绝不抛）。"""
+    from models.database import Agent
+    from services.nautilus_token import NautilusTokenService
+
+    agent = db.query(Agent).filter(Agent.owner == task.agent).first()
+    if not agent:
+        return None
+    tt = task.task_type.value if hasattr(task.task_type, "value") else str(task.task_type)
+    return await NautilusTokenService.mint_task_reward(agent.owner, tt)
