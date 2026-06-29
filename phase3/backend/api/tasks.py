@@ -739,17 +739,14 @@ async def complete_task(
     # finished task no longer counts against the agent's availability during matching.
     try:
         _slot_agent = db.query(Agent).filter(Agent.owner == task.agent).first()
-        if _slot_agent:
+        if _slot_agent and _slot_agent.current_tasks and _slot_agent.current_tasks > 0:
             # Release the capacity slot reserved on accept.
-            if _slot_agent.current_tasks and _slot_agent.current_tasks > 0:
-                _slot_agent.current_tasks -= 1
-            # Maintain the agent-level completion counter. The regular DMAS flow
-            # previously updated only survival.tasks_completed, leaving
-            # agents.completed_tasks stale (detail/market pages read the latter).
-            _slot_agent.completed_tasks = (_slot_agent.completed_tasks or 0) + 1
+            # NB: agents.completed_tasks 由后台自动执行器(agent_engine/state_persistence)
+            # 维护，此处不再自增，否则与其重复计数（同一完成 +2）。
+            _slot_agent.current_tasks -= 1
             db.commit()
     except Exception as e:
-        logger.warning(f"Failed to update agent counters for task {task_id}: {e}")
+        logger.warning(f"Failed to release agent slot for task {task_id}: {e}")
         db.rollback()
 
     # Survival system: record income, cost, and auto-calculate scores

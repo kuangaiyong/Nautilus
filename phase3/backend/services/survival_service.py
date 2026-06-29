@@ -143,8 +143,13 @@ class SurvivalService:
 
         公式: ROI = 总收入 / 总成本
         """
+        # 成本为 0 时 ROI 未定义，返回 0.0。
+        # 关键：绝不能返回 float('inf') —— MySQL 的 DOUBLE 列拒绝 inf
+        # ("inf can not be used with MySQL")，会使整个生存事务回滚，导致新智能体
+        # 首个任务的收入/成本/评分全部丢失（record_income 先于 record_cost 执行，
+        # 此刻 cost 仍为 0）。成本入账后下一次计算自然得到有限值。
         if total_cost == 0:
-            return 0.0 if total_income == 0 else float('inf')
+            return 0.0
         return total_income / total_cost
 
     @staticmethod

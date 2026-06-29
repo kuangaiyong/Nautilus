@@ -133,7 +133,7 @@ export default function AgentDetailPage() {
 
   useEffect(() => {
     if (!id) return
-    fetch(`/api/agents/${id}/token-balance`)
+    fetch(`/api/hub/agents/${id}/token-balance`)
       .then(r => r.json())
       .then(data => setNauBalance(data?.data?.nau_balance ?? null))
       .catch(() => {})
