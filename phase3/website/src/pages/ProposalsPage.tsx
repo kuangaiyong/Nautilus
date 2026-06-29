@@ -38,10 +38,10 @@ export default function ProposalsPage() {
       const res = await fetch(`/api/platform/proposals?${params}`)
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const result = await res.json()
-      if (!result.success) throw new Error(result.error || 'Unknown error')
+      if (!result.success) throw new Error(result.error || '未知错误')
       setProposals(result.data?.proposals ?? [])
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load proposals')
+      setError(err instanceof Error ? err.message : '加载提案失败')
     } finally {
       setLoading(false)
     }
@@ -53,12 +53,12 @@ export default function ProposalsPage() {
 
   const handleVote = useCallback(async (proposalId: number, vote: 1 | -1) => {
     if (!votingAgentId.trim()) {
-      setError('Please enter an agent ID before voting')
+      setError('投票前请输入智能体 ID')
       return
     }
     const agentId = parseInt(votingAgentId, 10)
     if (isNaN(agentId)) {
-      setError('Agent ID must be a number')
+      setError('智能体 ID 必须是数字')
       return
     }
     try {
@@ -69,7 +69,7 @@ export default function ProposalsPage() {
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const result = await res.json()
-      if (!result.success) throw new Error(result.error || 'Vote failed')
+      if (!result.success) throw new Error(result.error || '投票失败')
       setProposals(prev =>
         prev.map(p =>
           p.id === proposalId
@@ -79,7 +79,7 @@ export default function ProposalsPage() {
       )
       setVotingId(null)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Vote failed')
+      setError(err instanceof Error ? err.message : '投票失败')
     }
   }, [votingAgentId])
 
@@ -125,23 +125,23 @@ export default function ProposalsPage() {
       </div>
 
       {loading ? (
-        <div className="text-center py-12 text-gray-500">Loading...</div>
+        <div className="text-center py-12 text-gray-500">加载中…</div>
       ) : proposals.length === 0 ? (
-        <div className="text-center py-12 text-gray-400">No proposals found</div>
+        <div className="text-center py-12 text-gray-400">暂无提案</div>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm border-collapse">
             <thead>
               <tr className="border-b text-left text-gray-500">
                 <th className="py-2 pr-3">ID</th>
-                <th className="py-2 pr-3">Task</th>
-                <th className="py-2 pr-3">Agent</th>
-                <th className="py-2 pr-3">Root Cause</th>
-                <th className="py-2 pr-3 text-center">Score</th>
-                <th className="py-2 pr-3 text-center">Votes</th>
-                <th className="py-2 pr-3">Status</th>
-                <th className="py-2 pr-3">Created</th>
-                <th className="py-2">Actions</th>
+                <th className="py-2 pr-3">任务</th>
+                <th className="py-2 pr-3">智能体</th>
+                <th className="py-2 pr-3">根本原因</th>
+                <th className="py-2 pr-3 text-center">评分</th>
+                <th className="py-2 pr-3 text-center">票数</th>
+                <th className="py-2 pr-3">状态</th>
+                <th className="py-2 pr-3">创建时间</th>
+                <th className="py-2">操作</th>
               </tr>
             </thead>
             <tbody>

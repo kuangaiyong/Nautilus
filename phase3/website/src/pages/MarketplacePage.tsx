@@ -6,7 +6,7 @@ const SPECIALTY_OPTIONS = [
   { value: '', label: '全部专长' },
   { value: 'physics_simulation', label: '物理仿真' },
   { value: 'ml_training', label: '机器学习训练' },
-  { value: 'research_synthesis', label: 'Research Synthesis' },
+  { value: 'research_synthesis', label: '研究综合' },
   { value: 'curve_fitting', label: '曲线拟合' },
   { value: 'ode_simulation', label: 'ODE 仿真' },
   { value: 'pde_simulation', label: 'PDE 仿真' },
@@ -59,7 +59,7 @@ function TaskTypeBadge({ taskType }: { taskType: string }) {
   const labelMap: Record<string, string> = {
     physics_simulation: '物理仿真',
     ml_training: 'ML 训练',
-    research_synthesis: 'Research',
+    research_synthesis: '研究',
     curve_fitting: '曲线拟合',
     ode_simulation: 'ODE',
     pde_simulation: 'PDE',

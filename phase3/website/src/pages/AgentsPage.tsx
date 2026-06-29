@@ -202,7 +202,7 @@ export default function AgentsPage() {
                   <thead>
                     <tr className="border-b border-white/10">
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">排名</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Agent</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">智能体</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">等级</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">评分</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">ROI</th>
@@ -215,7 +215,7 @@ export default function AgentsPage() {
                       <tr key={agent.id} onClick={() => navigate(`/agents/${agent.agent_id}/survival`)} className="border-b border-white/5 hover:bg-white/5 cursor-pointer transition">
                         <td className="px-4 py-3 text-white font-bold">{index < 3 ? ['🥇', '🥈', '🥉'][index] : index + 1}</td>
                         <td className="px-4 py-3">
-                          <span className="text-blue-300">Agent #{agent.agent_id}</span>
+                          <span className="text-blue-300">智能体 #{agent.agent_id}</span>
                           {agent.is_protected && <span className="ml-2 text-xs text-green-400">🛡️</span>}
                         </td>
                         <td className="px-4 py-3"><span className={`px-2 py-1 rounded text-xs font-semibold ${levelColor(agent.survival_level)}`}>{agent.survival_level}</span></td>

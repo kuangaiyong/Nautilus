@@ -94,7 +94,7 @@ class PlatformObservatory:
         try:
             metrics["active_agents_24h"] = await self._safe_scalar(db,
                 "SELECT COUNT(DISTINCT assigned_agent_id) FROM academic_tasks "
-                "WHERE created_at > NOW() - INTERVAL '24 hours' AND status = 'completed'"
+                "WHERE created_at > NOW() - INTERVAL 24 HOUR AND status = 'completed'"
             ) or 0
         except Exception as exc:
             logger.warning("observatory: active_agents_24h failed: %s", exc)
@@ -104,7 +104,7 @@ class PlatformObservatory:
         try:
             metrics["tasks_completed_24h"] = await self._safe_scalar(db,
                 "SELECT COUNT(*) FROM academic_tasks "
-                "WHERE created_at > NOW() - INTERVAL '24 hours' AND status = 'completed'"
+                "WHERE created_at > NOW() - INTERVAL 24 HOUR AND status = 'completed'"
             ) or 0
         except Exception as exc:
             logger.warning("observatory: tasks_completed_24h failed: %s", exc)
@@ -114,7 +114,7 @@ class PlatformObservatory:
         try:
             metrics["tasks_failed_24h"] = await self._safe_scalar(db,
                 "SELECT COUNT(*) FROM academic_tasks "
-                "WHERE created_at > NOW() - INTERVAL '24 hours' AND status = 'failed'"
+                "WHERE created_at > NOW() - INTERVAL 24 HOUR AND status = 'failed'"
             ) or 0
         except Exception as exc:
             logger.warning("observatory: tasks_failed_24h failed: %s", exc)
@@ -158,7 +158,7 @@ class PlatformObservatory:
         try:
             val = await self._safe_scalar(db,
                 "SELECT COALESCE(SUM(token_reward),0) FROM academic_tasks "
-                "WHERE created_at > NOW() - INTERVAL '24 hours'"
+                "WHERE created_at > NOW() - INTERVAL 24 HOUR"
             )
             metrics["nau_minted_24h"] = float(val) if val is not None else 0.0
         except Exception as exc:

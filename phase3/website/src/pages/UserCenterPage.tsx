@@ -55,8 +55,8 @@ export default function UserCenterPage() {
         const data = await res.json()
         const tasks: Task[] = Array.isArray(data) ? data : (data.data || [])
         setRecentTasks(tasks.slice(0, 5))
-        const completed = tasks.filter(t => t.status === 'Completed').length
-        const failed = tasks.filter(t => t.status === 'Failed').length
+        const completed = tasks.filter(t => t.status === 'COMPLETED').length
+        const failed = tasks.filter(t => t.status === 'FAILED').length
         setStats({
           total_tasks: tasks.length,
           completed_tasks: completed,
@@ -66,7 +66,7 @@ export default function UserCenterPage() {
           reputation: 100 + completed * 10 - failed * 5
         })
       } catch (e) {
-        console.error('Failed to load:', e)
+        console.error('加载失败:', e)
       } finally {
         setLoading(false)
       }
@@ -87,14 +87,14 @@ export default function UserCenterPage() {
         body: JSON.stringify({ wallet_address: walletAddress })
       })
       if (res.ok) {
-        setMessage('Wallet address saved')
+        setMessage('钱包地址已保存')
         setEditMode(false)
         setTimeout(() => setMessage(''), 3000)
       } else {
         throw new Error('Failed')
       }
     } catch (e: any) {
-      setMessage('Save failed: ' + e.message)
+      setMessage('保存失败：' + e.message)
     } finally {
       setSaving(false)
     }
@@ -107,16 +107,21 @@ export default function UserCenterPage() {
 
   const getStatusColor = (s: string) => {
     const colors: Record<string, string> = {
-      Open: 'bg-green-100 text-green-800',
-      Accepted: 'bg-blue-100 text-blue-800',
-      Submitted: 'bg-yellow-100 text-yellow-800',
-      Completed: 'bg-gray-100 text-gray-800',
-      Failed: 'bg-red-100 text-red-800'
+      OPEN: 'bg-green-100 text-green-800',
+      ACCEPTED: 'bg-blue-100 text-blue-800',
+      SUBMITTED: 'bg-yellow-100 text-yellow-800',
+      COMPLETED: 'bg-gray-100 text-gray-800',
+      FAILED: 'bg-red-100 text-red-800'
     }
     return colors[s] || 'bg-gray-100 text-gray-800'
   }
 
-  const formatEth = (wei: number) => (wei / 1e18).toFixed(4)
+  const statusLabel = (s: string) => (({
+    OPEN: '开放中', ACCEPTED: '已接单', SUBMITTED: '已提交',
+    COMPLETED: '已完成', FAILED: '失败'
+  } as Record<string, string>)[s] || s)
+
+  const formatHua = (wei: number) => (wei / 1e18).toFixed(4)
 
   if (!user) return null
 
@@ -124,12 +129,12 @@ export default function UserCenterPage() {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 py-8 px-4">
       <div className="max-w-7xl mx-auto">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">User Center</h1>
-          <p className="text-gray-600 mt-2">Manage your account and tasks</p>
+          <h1 className="text-3xl font-bold text-gray-900">个人中心</h1>
+          <p className="text-gray-600 mt-2">管理你的账户与任务</p>
         </div>
 
         {message && (
-          <div className={`mb-6 p-4 rounded-lg ${message.includes('failed') || message.includes('Failed') ? 'bg-red-50 text-red-800 border border-red-200' : 'bg-green-50 text-green-800 border border-green-200'}`}>
+          <div className={`mb-6 p-4 rounded-lg ${message.includes('失败') ? 'bg-red-50 text-red-800 border border-red-200' : 'bg-green-50 text-green-800 border border-green-200'}`}>
             {message}
           </div>
         )}
@@ -138,9 +143,9 @@ export default function UserCenterPage() {
           <div className="lg:col-span-1 space-y-6">
             <div className="bg-white rounded-lg shadow-lg p-6">
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-bold">Profile</h2>
+                <h2 className="text-xl font-bold">个人资料</h2>
                 <button onClick={handleLogout} className="text-red-600 hover:text-red-700 flex items-center text-sm">
-                  <LogOut className="w-4 h-4 mr-1" />Logout
+                  <LogOut className="w-4 h-4 mr-1" />退出登录
                 </button>
               </div>
               <div className="space-y-4">
@@ -151,7 +156,7 @@ export default function UserCenterPage() {
                 </div>
                 <div className="text-center">
                   <h3 className="text-xl font-bold">{(user as any).username || (user as any).email}</h3>
-                  <p className="text-sm text-gray-500">ID: {(user as any).id}</p>
+                  <p className="text-sm text-gray-500">ID：{(user as any).id}</p>
                 </div>
                 {(user as any).email && (
                   <div className="flex items-center text-gray-600">
@@ -163,11 +168,11 @@ export default function UserCenterPage() {
                 <div className="pt-4 border-t">
                   <div className="flex items-center justify-between mb-2">
                     <label className="text-sm font-medium text-gray-700 flex items-center">
-                      <Wallet className="w-4 h-4 mr-2" />Wallet Address
+                      <Wallet className="w-4 h-4 mr-2" />钱包地址
                     </label>
                     {!editMode && (
                       <button onClick={() => setEditMode(true)} className="text-blue-600 text-sm flex items-center">
-                        <Edit2 className="w-3 h-3 mr-1" />Edit
+                        <Edit2 className="w-3 h-3 mr-1" />编辑
                       </button>
                     )}
                   </div>
@@ -186,25 +191,25 @@ export default function UserCenterPage() {
                           disabled={saving}
                           className="flex-1 bg-blue-600 text-white py-2 rounded-lg text-sm disabled:bg-gray-400 flex items-center justify-center"
                         >
-                          <Save className="w-4 h-4 mr-1" />Save
+                          <Save className="w-4 h-4 mr-1" />保存
                         </button>
                         <button
                           onClick={() => { setEditMode(false); setWalletAddress((user as any).wallet_address || '') }}
                           className="flex-1 border text-gray-700 py-2 rounded-lg text-sm flex items-center justify-center"
                         >
-                          <X className="w-4 h-4 mr-1" />Cancel
+                          <X className="w-4 h-4 mr-1" />取消
                         </button>
                       </div>
                     </div>
                   ) : (
-                    <p className="text-sm text-gray-600 break-all">{(user as any).wallet_address || 'Not set'}</p>
+                    <p className="text-sm text-gray-600 break-all">{(user as any).wallet_address || '未设置'}</p>
                   )}
                 </div>
 
                 <div className="pt-4 border-t">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium flex items-center">
-                      <Award className="w-4 h-4 mr-2" />Reputation
+                      <Award className="w-4 h-4 mr-2" />信誉
                     </span>
                     <span className="text-lg font-bold text-blue-600">{stats.reputation}</span>
                   </div>
@@ -219,13 +224,13 @@ export default function UserCenterPage() {
             </div>
 
             <div className="bg-white rounded-lg shadow-lg p-6">
-              <h2 className="text-lg font-bold mb-4">Quick Actions</h2>
+              <h2 className="text-lg font-bold mb-4">快捷操作</h2>
               <div className="space-y-2">
                 <button onClick={() => navigate('/tasks/create')} className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 flex items-center justify-center">
-                  <Activity className="w-5 h-5 mr-2" />Create New Task
+                  <Activity className="w-5 h-5 mr-2" />发布新任务
                 </button>
                 <button onClick={() => navigate('/tasks')} className="w-full border text-gray-700 py-3 rounded-lg hover:bg-gray-50 flex items-center justify-center">
-                  <TrendingUp className="w-5 h-5 mr-2" />Browse Marketplace
+                  <TrendingUp className="w-5 h-5 mr-2" />浏览任务市场
                 </button>
               </div>
             </div>
@@ -234,27 +239,27 @@ export default function UserCenterPage() {
           <div className="lg:col-span-2 space-y-6">
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-white rounded-lg shadow-lg p-6">
-                <p className="text-sm text-gray-600">Total Tasks</p>
+                <p className="text-sm text-gray-600">任务总数</p>
                 <p className="text-3xl font-bold mt-1">{stats.total_tasks}</p>
               </div>
               <div className="bg-white rounded-lg shadow-lg p-6">
-                <p className="text-sm text-gray-600">Completed</p>
+                <p className="text-sm text-gray-600">已完成</p>
                 <p className="text-3xl font-bold text-green-600 mt-1">{stats.completed_tasks}</p>
               </div>
               <div className="bg-white rounded-lg shadow-lg p-6">
-                <p className="text-sm text-gray-600">Total Earnings</p>
-                <p className="text-2xl font-bold text-purple-600 mt-1">{formatEth(stats.total_earnings)} ETH</p>
+                <p className="text-sm text-gray-600">累计收入</p>
+                <p className="text-2xl font-bold text-purple-600 mt-1">{formatHua(stats.total_earnings)} 华币</p>
               </div>
               <div className="bg-white rounded-lg shadow-lg p-6">
-                <p className="text-sm text-gray-600">Total Spent</p>
-                <p className="text-2xl font-bold text-orange-600 mt-1">{formatEth(stats.total_spent)} ETH</p>
+                <p className="text-sm text-gray-600">累计支出</p>
+                <p className="text-2xl font-bold text-orange-600 mt-1">{formatHua(stats.total_spent)} 华币</p>
               </div>
             </div>
 
             <div className="bg-white rounded-lg shadow-lg p-6">
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-bold">Recent Tasks</h2>
-                <button onClick={() => navigate('/tasks')} className="text-blue-600 text-sm">View all &rarr;</button>
+                <h2 className="text-xl font-bold">最近任务</h2>
+                <button onClick={() => navigate('/tasks')} className="text-blue-600 text-sm">查看全部 &rarr;</button>
               </div>
               {loading ? (
                 <div className="flex justify-center py-8">
@@ -263,7 +268,7 @@ export default function UserCenterPage() {
               ) : recentTasks.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
                   <Clock className="w-12 h-12 mx-auto mb-3 text-gray-400" />
-                  <p>No tasks yet</p>
+                  <p>暂无任务</p>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -276,13 +281,13 @@ export default function UserCenterPage() {
                       <div className="flex justify-between">
                         <div>
                           <div className="flex items-center gap-2 mb-2">
-                            <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(task.status)}`}>{task.status}</span>
+                            <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(task.status)}`}>{statusLabel(task.status)}</span>
                             <span className="px-2 py-1 bg-gray-100 rounded text-xs">{task.task_type}</span>
                           </div>
                           <p className="text-sm font-medium">{task.description}</p>
                           <p className="text-xs text-gray-500 mt-1">{new Date(task.created_at).toLocaleString()}</p>
                         </div>
-                        <p className="text-sm font-bold text-blue-600">{formatEth(task.reward)} ETH</p>
+                        <p className="text-sm font-bold text-blue-600">{formatHua(task.reward)} 华币</p>
                       </div>
                     </div>
                   ))}

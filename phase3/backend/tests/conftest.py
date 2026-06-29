@@ -24,6 +24,11 @@ os.environ["RATE_LIMIT_ENABLED"] = "false"
 # 添加项目根目录到Python路径
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+# 注册 AgentSurvival 映射器：Agent.survival 以字符串 "AgentSurvival" 引用且 lazy="joined"，
+# 只 import models.database 的隔离测试（如 test_e2e_auth）在配置 mapper 时无法解析该名字而报错。
+# 此处仅定义类、不连数据库，导入即把 AgentSurvival/AgentTransaction 登记进全局 mapper 注册表。
+import models.agent_survival  # noqa: E402,F401
+
 
 def pytest_configure(config):
     """Pytest配置钩子"""

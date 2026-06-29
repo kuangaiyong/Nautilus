@@ -299,7 +299,7 @@ def apply_inactivity_decay(db) -> int:
             "WHERE id NOT IN ("
             "  SELECT DISTINCT assigned_agent_id FROM academic_tasks "
             "  WHERE assigned_agent_id IS NOT NULL "
-            "    AND updated_at >= NOW() - INTERVAL '7 days'"
+            "    AND updated_at >= NOW() - INTERVAL 7 DAY"
             ")"
         ))
         db.commit()

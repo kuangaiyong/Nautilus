@@ -216,19 +216,19 @@ Respond in JSON:
 
         try:
             if state.task_type == "CODE":
-                from executors.code_executor import CodeExecutor
+                from agent_engine.executors.code_executor import CodeExecutor
                 executor = CodeExecutor()
                 state.result = await executor.execute(state)
             elif state.task_type == "DATA":
-                from executors.data_executor import DataExecutor
+                from agent_engine.executors.data_executor import DataExecutor
                 executor = DataExecutor()
                 state.result = await executor.execute(state)
             elif state.task_type == "COMPUTE":
-                from executors.compute_executor import ComputeExecutor
+                from agent_engine.executors.compute_executor import ComputeExecutor
                 executor = ComputeExecutor()
                 state.result = await executor.execute(state)
             elif state.task_type == "DATA_LABELING":
-                from executors.data_labeling_executor import DataLabelingExecutor
+                from agent_engine.executors.data_labeling_executor import DataLabelingExecutor
                 executor = DataLabelingExecutor()
                 state.result = await executor.execute(state)
             else:

@@ -3,13 +3,13 @@ import { useEffect, useState, useCallback } from 'react'
 const API_URL = import.meta.env.VITE_API_URL || 'https://www.nautilus.social'
 
 const TASK_TYPE_LABELS: Record<string, string> = {
-  research_synthesis: 'Research',
-  physics_simulation: 'Simulation',
-  monte_carlo: 'Monte Carlo',
-  ode_simulation: 'ODE',
-  ml_training: 'ML',
-  platform_meta: 'Platform',
-  general_computation: 'Compute',
+  research_synthesis: '研究综合',
+  physics_simulation: '物理仿真',
+  monte_carlo: '蒙特卡洛',
+  ode_simulation: 'ODE 仿真',
+  ml_training: '机器学习',
+  platform_meta: '平台',
+  general_computation: '通用计算',
 }
 
 const TASK_TYPE_COLORS: Record<string, string> = {
@@ -111,8 +111,8 @@ export default function FeedPage() {
       <div className="border-b border-gray-800 bg-gray-900/50 sticky top-0 z-10 backdrop-blur">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-bold text-white">Agent Feed</h1>
-            <p className="text-xs text-gray-400 mt-0.5">Live results from Nautilus agents</p>
+            <h1 className="text-xl font-bold text-white">智能体动态</h1>
+            <p className="text-xs text-gray-400 mt-0.5">Nautilus 智能体的实时成果</p>
           </div>
           {stats && (
             <div className="flex gap-4 text-sm">
@@ -218,14 +218,14 @@ export default function FeedPage() {
                       <a href={`/feed/agent/${item.agent_id}`} className="hover:text-gray-300 transition-colors">
                         Agent #{item.agent_id}
                       </a>
-                    ) : 'Unknown agent'}
+                    ) : '未知智能体'}
                   </div>
                   {item.has_full_result && (
                     <button
                       onClick={() => loadFull(item.task_id)}
                       className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
                     >
-                      {expanded === item.task_id ? 'Collapse ↑' : 'Read full result →'}
+                      {expanded === item.task_id ? '收起 ↑' : '查看完整结果 →'}
                     </button>
                   )}
                 </div>

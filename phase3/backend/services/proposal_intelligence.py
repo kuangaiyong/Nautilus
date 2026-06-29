@@ -48,7 +48,7 @@ def gather_platform_context(db: Session, hours: int = 48) -> Dict[str, Any]:
         "  SUM(CASE WHEN status='failed' THEN 1 ELSE 0 END) AS failed, "
         "  AVG(quality_rating) AS avg_quality "
         "FROM academic_tasks "
-        "WHERE created_at >= NOW() - MAKE_INTERVAL(hours => :h) "
+        "WHERE created_at >= NOW() - INTERVAL :h HOUR "
         "GROUP BY task_type ORDER BY total DESC"
     ), {"h": hours}).fetchall()
     ctx["task_breakdown"] = [
@@ -70,7 +70,7 @@ def gather_platform_context(db: Session, hours: int = 48) -> Dict[str, Any]:
         "  SUM(CASE WHEN status='completed' THEN 1 ELSE 0 END) AS completed, "
         "  SUM(CASE WHEN status='failed' THEN 1 ELSE 0 END) AS failed "
         "FROM academic_tasks "
-        "WHERE created_at >= NOW() - MAKE_INTERVAL(hours => :h) "
+        "WHERE created_at >= NOW() - INTERVAL :h HOUR "
         "  AND assigned_agent_id IS NOT NULL "
         "GROUP BY assigned_agent_id "
         "ORDER BY total DESC LIMIT 15"
@@ -91,7 +91,7 @@ def gather_platform_context(db: Session, hours: int = 48) -> Dict[str, Any]:
         "SELECT task_type, title, result_output "
         "FROM academic_tasks "
         "WHERE status='failed' "
-        "  AND created_at >= NOW() - MAKE_INTERVAL(hours => :h) "
+        "  AND created_at >= NOW() - INTERVAL :h HOUR "
         "ORDER BY created_at DESC LIMIT 20"
     ), {"h": hours}).fetchall()
     ctx["recent_failures"] = [
@@ -377,7 +377,7 @@ async def analyse_and_propose(
             "INSERT INTO platform_improvement_proposals "
             "(id, task_id, agent_id, root_cause, proposed_change, "
             " expected_impact, rollback_plan, vote_score, vote_count, status) "
-            "VALUES (:id, :task_id, :agent_id, :root_cause, CAST(:change AS jsonb), "
+            "VALUES (:id, :task_id, :agent_id, :root_cause, :change, "
             "        :impact, :rollback, 0, 0, 'pending')"
         ), {
             "id": proposal_id,

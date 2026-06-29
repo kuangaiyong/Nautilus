@@ -37,6 +37,10 @@ TESTING = os.getenv("TESTING", "false").lower() == "true"
 # Create limiter with disabled state for testing
 limiter = Limiter(key_func=get_remote_address, enabled=not TESTING)
 
+# Login/register rate limit. Kept tight by default (brute-force protection) but
+# overridable via env so internal/E2E deployments can loosen it without code change.
+AUTH_RATE_LIMIT = os.getenv("AUTH_RATE_LIMIT", "5/minute")
+
 # OAuth Configuration
 GITHUB_CLIENT_ID = os.getenv("GITHUB_CLIENT_ID")
 GITHUB_CLIENT_SECRET = os.getenv("GITHUB_CLIENT_SECRET")
@@ -115,7 +119,7 @@ class Token(BaseModel):
 
 
 @router.post("/register", response_model=Token, status_code=status.HTTP_201_CREATED)
-@limiter.limit("5/minute")
+@limiter.limit(AUTH_RATE_LIMIT)
 async def register(request: Request, user_data: UserRegister, db: Session = Depends(get_db)):
     """
     Register a new user account.
@@ -198,7 +202,7 @@ async def register(request: Request, user_data: UserRegister, db: Session = Depe
 
 
 @router.post("/login", response_model=Token)
-@limiter.limit("5/minute")
+@limiter.limit(AUTH_RATE_LIMIT)
 async def login(request: Request, user_data: UserLogin, db: Session = Depends(get_db)):
     """
     Authenticate user and receive JWT token.
@@ -258,7 +262,6 @@ async def login(request: Request, user_data: UserLogin, db: Session = Depends(ge
         record_security_event(
             event_type="permission_denied",
             severity="warning",
-            details={"username": user_data.username, "reason": "inactive_user"}
         )
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

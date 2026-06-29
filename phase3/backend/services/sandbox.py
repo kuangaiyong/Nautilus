@@ -36,7 +36,7 @@ def create_experiment(db: Session, proposal_id: str, proposed_change: dict) -> O
             """INSERT INTO sandbox_experiments
                (id, proposal_id, proposed_change, observation_hours, ends_at,
                 sandbox_traffic_pct, status, baseline_metrics, sandbox_metrics)
-               VALUES (:id, :proposal_id, CAST(:proposed_change AS jsonb), :observation_hours,
+               VALUES (:id, :proposal_id, :proposed_change, :observation_hours,
                        :ends_at, :traffic_pct, 'running', '{}', '{}')"""
         ), {
             "id": exp_id,

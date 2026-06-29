@@ -22,6 +22,7 @@ from memory.reflection_system import get_reflection_system
 from services.task_service import get_tasks_cached, invalidate_tasks_cache
 from services.survival_service import SurvivalService
 from services.anti_cheat_service import AntiCheatService
+from services.wallet import ensure_user_wallet
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -177,10 +178,13 @@ async def create_task(
     # Generate task ID
     task_id = f"task_{int(datetime.now(timezone.utc).timestamp() * 1000)}"
 
+    # Ensure the publisher has a custodial wallet (account/password users have none yet)
+    publisher_address = ensure_user_wallet(db, current_user)
+
     # Create task in database first
     task = Task(
         task_id=task_id,
-        publisher=current_user.wallet_address,
+        publisher=publisher_address,
         description=task_data.description,
         input_data=task_data.input_data,
         expected_output=task_data.expected_output,
@@ -702,13 +706,45 @@ async def complete_task(
             detail="Task must be submitted before completion"
         )
 
-    # Update database
+    if not task.agent:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Task has no assigned agent to reward"
+        )
+
+    # Reviewer (publisher) approved the submission. Settle the reward on-chain
+    # BEFORE marking the task completed, so a payment failure leaves the task
+    # reviewable rather than silently "completed but unpaid". The publisher's
+    # custodial wallet transfers the full 华币 reward to the agent (gasPrice 0).
+    from services.wallet import pay_hua_from_custodial
+    try:
+        reward_tx = pay_hua_from_custodial(db, current_user, task.agent, task.reward)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"error": {"code": "REWARD_PAYMENT_FAILED", "message": str(exc)}},
+        )
+
+    # Update database (mark completed + record the reward payout tx)
     task.status = TaskStatus.COMPLETED
     task.completed_at = datetime.now(timezone.utc)
     task.verified_at = datetime.now(timezone.utc)
+    task.blockchain_complete_tx = reward_tx
+    task.blockchain_status = "rewarded"
 
     db.commit()
     db.refresh(task)
+
+    # Release the agent's capacity slot reserved on accept (current_tasks += 1), so a
+    # finished task no longer counts against the agent's availability during matching.
+    try:
+        _slot_agent = db.query(Agent).filter(Agent.owner == task.agent).first()
+        if _slot_agent and _slot_agent.current_tasks > 0:
+            _slot_agent.current_tasks -= 1
+            db.commit()
+    except Exception as e:
+        logger.warning(f"Failed to release agent slot for task {task_id}: {e}")
+        db.rollback()
 
     # Survival system: record income, cost, and auto-calculate scores
     try:
@@ -747,7 +783,11 @@ async def complete_task(
             logger.info(f"Survival auto-scored for agent {agent.agent_id} on task {task.task_id}")
     except Exception as e:
         logger.error(f"Survival system error for task {task_id}: {e}")
-        # Don't let survival errors break task completion
+        # Don't let survival errors break task completion. Roll back the failed
+        # sub-transaction so the (already-committed) COMPLETED task can still be
+        # serialized into the response — a poisoned session would otherwise turn
+        # a settled reward into a misleading 500.
+        db.rollback()
 
     # Store task memory and reflection
     try:
@@ -837,7 +877,7 @@ async def complete_task(
             try:
                 gep = get_gep_adapter()
                 await gep.publish_gene(
-                    name=f"Task {task.id}: {task.title[:50]}",
+                    name=f"Task {task.id}: {task.description[:50] if task.description else ''}",
                     description=task.description[:200] if task.description else "",
                     code=task.result[:2000] if task.result else "",
                     task_type=task.task_type.value if task.task_type else "general",
@@ -852,54 +892,10 @@ async def complete_task(
     except Exception:
         pass  # GEP is optional, never block task completion
 
-    # Phase 2: Complete task on blockchain (triggers reward distribution)
-    try:
-        blockchain = get_blockchain_service()
-
-        tx_hash = await blockchain.complete_task_on_chain(task.task_id)
-
-        if tx_hash:
-            task.blockchain_complete_tx = tx_hash
-            db.commit()
-            db.refresh(task)
-
-            logger.info(f"Task {task.task_id} completed on blockchain: {tx_hash}")
-
-            # Phase 3: Calculate gas fees for all transactions
-            tx_hashes = [
-                task.blockchain_tx_hash,
-                task.blockchain_accept_tx,
-                task.blockchain_submit_tx,
-                task.blockchain_complete_tx
-            ]
-
-            gas_info = blockchain.calculate_task_total_gas(tx_hashes)
-
-            if gas_info:
-                task.gas_used = gas_info['total_gas_used']
-                task.gas_cost = gas_info['total_gas_cost']
-                task.gas_split = gas_info['gas_split']
-
-                db.commit()
-                db.refresh(task)
-
-                # Calculate actual reward after gas deduction
-                actual_reward = task.reward - task.gas_split
-
-                logger.info(f"Task {task.task_id} gas calculation:")
-                logger.info(f"  Total gas used: {task.gas_used}")
-                logger.info(f"  Total gas cost: {task.gas_cost} Wei")
-                logger.info(f"  Agent's gas share (50%): {task.gas_split} Wei")
-                logger.info(f"  Original reward: {task.reward} Wei")
-                logger.info(f"  Actual reward after gas deduction: {actual_reward} Wei")
-            else:
-                logger.warning(f"Failed to calculate gas fees for task {task.task_id}")
-        else:
-            logger.warning(f"Task {task.task_id} completed in database but blockchain complete failed")
-
-    except Exception as e:
-        logger.error(f"Blockchain integration error for task complete {task.task_id}: {e}")
-
+    # Reward was already settled on-chain above (publisher -> agent 华币 transfer,
+    # tx recorded in task.blockchain_complete_tx) before the task was marked
+    # completed. Gas is free on the private chain (gasPrice 0), so there is no
+    # gas-split deduction.
     return task
 
 

@@ -14,7 +14,8 @@ export default defineConfig({
     port: 3000,
     open: true,
     proxy: {
-      '/api': {
+      // 用正则只代理 /api/ 开头的真实接口；前缀写法 '/api' 会把 /api-docs 这类前端路由也代理走导致 404
+      '^/api/': {
         target: 'http://localhost:8000',
         changeOrigin: true
       }

@@ -176,6 +176,15 @@ class Web3Config:
         ).call()
         return raw / 10 ** self.token_decimals
 
+    def get_nau_balance(self, address: str) -> float:
+        """Get NAU balance (NautilusToken, PoUW reward, 18 decimals)."""
+        if not self.nau_contract:
+            return 0.0
+        raw = self.nau_contract.functions.balanceOf(
+            Web3.to_checksum_address(address)
+        ).call()
+        return raw / 10 ** 18
+
     def get_token_contract(self, token: str):
         """Get ERC20 contract by token name ('usdc', 'usdt' or 'hua')."""
         t = token.lower()

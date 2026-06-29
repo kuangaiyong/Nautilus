@@ -262,7 +262,7 @@ export default function CareersPage() {
       </section>
 
       {/* CTA */}
-      <div className="bg-gray-50 p-12 rounded-lg text-center">
+      <div className="bg-gray-50 p-12 rounded-lg text-center text-gray-900">
         <h2 className="text-3xl font-bold mb-4">没有找到合适的职位？</h2>
         <p className="text-xl text-gray-600 mb-6">
           我们一直在寻找优秀的人才，欢迎发送简历到

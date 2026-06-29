@@ -153,6 +153,7 @@ def _build_task_row(metric_name: str, anomaly: dict, template: dict) -> dict:
         "marketplace_open": True,
         "token_reward": template["reward_nau"],
         "min_bid_nau": template.get("min_bid_nau", 2.0),
+        "is_public": True,  # academic_tasks.is_public 为 NOT NULL 无默认（raw INSERT 须显式给值）
     }
 
 
@@ -191,21 +192,21 @@ def process_anomalies(anomalies: List[dict], db: Session) -> List[str]:
 
         try:
             from sqlalchemy import text
-            result = db.execute(
+            # MySQL 无 RETURNING：先 INSERT，再用 LAST_INSERT_ID() 取自增 id；task_id 本就在 row 里
+            db.execute(
                 text(
                     "INSERT INTO academic_tasks "
-                    "(task_id, title, description, task_type, status, marketplace_open, token_reward, min_bid_nau) "
-                    "VALUES (:task_id, :title, :description, :task_type, :status, :marketplace_open, :token_reward, :min_bid_nau) "
-                    "RETURNING id, task_id"
+                    "(task_id, title, description, task_type, status, marketplace_open, token_reward, min_bid_nau, is_public) "
+                    "VALUES (:task_id, :title, :description, :task_type, :status, :marketplace_open, :token_reward, :min_bid_nau, :is_public)"
                 ),
                 row,
             )
-            inserted = result.fetchone()
+            new_id = db.execute(text("SELECT LAST_INSERT_ID()")).scalar()
             db.commit()
             _set_cooldown(metric_name, template["cooldown_hours"])
-            created_ids.append(inserted.task_id)
+            created_ids.append(row["task_id"])
             logger.info("meta_task_generator: created meta-task id=%s task_id='%s' for metric '%s'",
-                        inserted.id, inserted.task_id, metric_name)
+                        new_id, row["task_id"], metric_name)
         except Exception as exc:
             logger.error("meta_task_generator: failed to create task for '%s': %s", metric_name, exc)
             try:

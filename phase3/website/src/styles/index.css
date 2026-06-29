@@ -6,6 +6,20 @@
   body {
     @apply bg-dark-900 text-dark-50;
   }
+
+  /* 全局 body 文字是近白色（深色主题）。但白色卡片与表单控件（输入框默认白底）上，
+     未显式着色的内容会变成白底白字、看不清。给它们一个深色默认文字色；
+     任何显式的 text-* / text-white（深色卡片上的）都会覆盖这里，故对深色主题无影响。 */
+  .bg-white,
+  .bg-white\/70,
+  .bg-white\/50 {
+    color: rgb(17 24 39);
+  }
+  input,
+  textarea,
+  select {
+    color: rgb(17 24 39);
+  }
 }
 
 @layer components {

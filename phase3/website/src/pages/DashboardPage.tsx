@@ -30,7 +30,7 @@ export default function DashboardPage() {
 
   useEffect(() => { fetchData(); const t = setInterval(fetchData, 30000); return () => clearInterval(t) }, [])
 
-  if (loading) return <div className="min-h-screen bg-gray-900 flex items-center justify-center text-gray-400">Loading...</div>
+  if (loading) return <div className="min-h-screen bg-gray-900 flex items-center justify-center text-gray-400">加载中…</div>
 
   const fw = flywheel || {}
   const rev = fw.revenue || {}
@@ -60,7 +60,7 @@ export default function DashboardPage() {
         {/* Header */}
         <div className="text-center">
           <h1 className="text-3xl font-bold text-white">Nautilus Rehoboam</h1>
-          <p className="text-gray-400 text-sm mt-1">Institutional AI — Self-Driving Dashboard</p>
+          <p className="text-gray-400 text-sm mt-1">机构级 AI · 自驾驶仪表盘</p>
           <div className="mt-3">
             <span className={`text-2xl font-bold ${statusColor(fw.flywheel_status || 'stalled')}`}>
               {fw.flywheel_status === 'accelerating' ? '🚀 加速中' :
@@ -173,10 +173,10 @@ export default function DashboardPage() {
             <h3 className="text-white font-semibold mb-3">Agent 生命状态</h3>
             <div className="flex flex-wrap gap-4 mb-4 text-sm">
               {[
-                { icon: '\uD83D\uDFE2', label: 'alive', count: heartbeat.counts?.alive ?? 0 },
-                { icon: '\uD83D\uDFE1', label: 'coma',  count: heartbeat.counts?.coma ?? 0 },
-                { icon: '\uD83D\uDD34', label: 'dead',  count: heartbeat.counts?.dead ?? 0 },
-                { icon: '\u26AB',       label: 'inactive', count: heartbeat.counts?.inactive ?? 0 },
+                { icon: '\uD83D\uDFE2', label: '\u5B58\u6D3B', count: heartbeat.counts?.alive ?? 0 },
+                { icon: '\uD83D\uDFE1', label: '\u660F\u8FF7',  count: heartbeat.counts?.coma ?? 0 },
+                { icon: '\uD83D\uDD34', label: '\u6B7B\u4EA1',  count: heartbeat.counts?.dead ?? 0 },
+                { icon: '\u26AB',       label: '\u672A\u6FC0\u6D3B', count: heartbeat.counts?.inactive ?? 0 },
               ].map((s) => (
                 <span key={s.label} className="text-gray-300">
                   {s.icon} {s.label} ({s.count})
@@ -186,7 +186,7 @@ export default function DashboardPage() {
 
             {(heartbeat.recent_actions?.length ?? 0) > 0 && (
               <div className="space-y-1">
-                <p className="text-xs text-gray-500 mb-1">Recent transitions</p>
+                <p className="text-xs text-gray-500 mb-1">最近状态变更</p>
                 {(heartbeat.recent_actions as Array<{agent_name: string; from_status: string; to_status: string; timestamp: string}>)
                   .slice(-8).reverse().map((a, i) => (
                   <div key={i} className="text-xs text-gray-400">

@@ -8,6 +8,7 @@ Matches tasks to suitable agents based on:
 - Task requirements
 """
 import logging
+from datetime import datetime, timezone
 from typing import List, Optional, Dict, Any
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_
@@ -20,6 +21,25 @@ from automation_metrics import (
 )
 
 logger = logging.getLogger(__name__)
+
+# 任务类型 → 能胜任该类型的技能标签（全部小写）。智能体注册的是技能标签
+# （python/fastapi/code-generation…），而任务用的是类型枚举（CODE/DATA/…）。
+# 撮合打分时必须用本表把两者对齐，否则“任务类型 in 技能标签集合”永远为 False，
+# 专长分恒为 0，任何任务都达不到 min_score 而无法被自动分配。
+TASK_TYPE_SKILLS = {
+    "CODE": {"python", "javascript", "typescript", "go", "rust", "java", "c++",
+             "code-generation", "coding", "development", "fastapi", "backend", "frontend",
+             "engineering", "tool-use", "test-generation", "testing", "debugging",
+             "代码", "开发", "编程", "测试"},
+    "DATA": {"data", "data-analysis", "数据分析", "数据", "statistical_analysis",
+             "pandas", "sql", "etl", "data_visualization", "数据可视化"},
+    "COMPUTE": {"compute", "computation", "general_computation", "simulation", "仿真", "计算",
+                "monte_carlo", "physics_simulation", "ode_simulation", "pde_simulation",
+                "ml_training", "machine-learning"},
+    "RESEARCH": {"research", "reasoning", "research_synthesis", "analysis", "研究", "推理"},
+    "DESIGN": {"design", "ui", "ux", "设计"},
+    "WRITING": {"writing", "technical-writing", "documentation", "写作", "文档"},
+}
 
 
 async def match_task_to_agents(
@@ -104,30 +124,22 @@ def calculate_agent_score(task: Task, agent: Agent) -> float:
     score = 0.0
 
     # 1. Specialty match (0-40 points)
+    # 智能体注册的是技能标签（python/fastapi…），任务用的是类型（CODE/DATA…）。
+    # 直接比较二者永远不相交，故用 TASK_TYPE_SKILLS 把任务类型映射到相关技能再判断。
     if agent.specialties:
-        agent_specialties = set(agent.specialties.split(","))
-        task_type = task.task_type.value if hasattr(task.task_type, 'value') else str(task.task_type)
+        agent_specialties = {s.strip().lower() for s in agent.specialties.split(",") if s.strip()}
+        task_type = (task.task_type.value if hasattr(task.task_type, 'value') else str(task.task_type)).upper()
+        relevant = TASK_TYPE_SKILLS.get(task_type, set())
 
-        if task_type in agent_specialties:
-            score += 40  # Perfect match
-        elif "ALL" in agent_specialties:
-            score += 20  # General agent
-        else:
-            # Partial match for related types
-            related_types = {
-                "CODE": ["DATA", "COMPUTE"],
-                "DATA": ["CODE", "COMPUTE"],
-                "COMPUTE": ["CODE", "DATA"]
-            }
-            if task_type in related_types:
-                for related in related_types[task_type]:
-                    if related in agent_specialties:
-                        score += 10
-                        break
+        if task_type.lower() in agent_specialties or (agent_specialties & relevant):
+            score += 40  # 显式标注该类型，或拥有相关技能 → 胜任
+        elif "all" in agent_specialties:
+            score += 20  # 通用智能体
 
     # 2. Reputation (0-30 points)
-    # Normalize reputation (assume max 1000)
-    reputation_score = min(agent.reputation / 1000.0 * 30, 30)
+    # 智能体出生信誉为 100，约 200 视为高信誉；以 200 为满分基准归一化
+    # （原先按 /1000 归一，使 100 信誉只得 3 分，叠加专长分缺失导致永远达不到门槛）。
+    reputation_score = min(agent.reputation / 200.0 * 30, 30)
     score += reputation_score
 
     # 3. Availability (0-20 points)
@@ -195,6 +207,7 @@ async def auto_assign_task(
         # Update task status
         task.status = TaskStatus.ACCEPTED
         task.agent = agent.owner
+        task.accepted_at = datetime.now(timezone.utc)  # 与手动 accept 一致，供完成时计算任务时长
         db.commit()
 
         logger.info(f"✅ Task {task_id} auto-assigned to agent {agent.agent_id} "

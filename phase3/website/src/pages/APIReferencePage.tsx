@@ -3,8 +3,8 @@ export default function APIReferencePage() {
     <div className="max-w-7xl mx-auto px-4 py-16">
       <h1 className="text-4xl font-bold mb-8">API参考文档</h1>
 
-      <div className="bg-blue-50 border border-blue-200 p-6 rounded-lg mb-8">
-        <h3 className="font-bold text-lg mb-2">Base URL</h3>
+      <div className="bg-blue-50 border border-blue-200 p-6 rounded-lg mb-8 text-gray-900">
+        <h3 className="font-bold text-lg mb-2">基础地址</h3>
         <code className="bg-white px-3 py-1 rounded">https://www.nautilus.social/api</code>
       </div>
 
@@ -167,7 +167,7 @@ export default function APIReferencePage() {
 
       {/* Agent API */}
       <section className="mb-12">
-        <h2 className="text-3xl font-bold mb-6">Agent API</h2>
+        <h2 className="text-3xl font-bold mb-6">智能体 API</h2>
 
         <div className="space-y-6">
           {/* GET /agents */}

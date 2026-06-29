@@ -399,12 +399,12 @@ class TestLogin:
         finally:
             db.close()
 
-        # 尝试登录
+        # 尝试登录：未激活用户应被拒为 403 Inactive user（与 api/auth.py 的 HTTP_403_FORBIDDEN 一致）
         response = client.post("/api/auth/login", json={
             "username": "testuser",
             "password": "MyStr0ng!Pass"
         })
-        assert response.status_code == 401
+        assert response.status_code == 403
 
 
 class TestGetCurrentUser:

@@ -276,7 +276,108 @@ class Web3AuthService:
 
 def _hash_mnemonic(mnemonic_phrase: str) -> str:
     import bcrypt
-    return bcrypt.hashpw(mnemonic_phrase.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+    # bcrypt only considers the first 72 bytes; truncate to stay within its hard limit.
+    return bcrypt.hashpw(mnemonic_phrase.encode("utf-8")[:72], bcrypt.gensalt()).decode("utf-8")
+
+
+_local_encryption: Optional[LocalKeyEncryptionProvider] = None
+
+
+def _get_local_encryption() -> LocalKeyEncryptionProvider:
+    global _local_encryption
+    if _local_encryption is None:
+        _local_encryption = LocalKeyEncryptionProvider()
+    return _local_encryption
+
+
+def ensure_user_wallet(db, user, wallet_type: str = "user") -> str:
+    """Ensure `user` has a custodial wallet; create one if missing.
+
+    Synchronous counterpart to WalletIssuerService.create_wallet for use in
+    sync request handlers (e.g. task publishing). Generates an HD wallet,
+    stores the AES-encrypted private key, back-fills user.wallet_address, and
+    returns the lower-cased address. Idempotent: returns the existing address
+    when the user already has one.
+    """
+    if user.wallet_address:
+        return user.wallet_address
+
+    from mnemonic import Mnemonic
+    from eth_account import Account
+    from models.database import Wallet
+    Account.enable_unaudited_hdwallet_features()
+
+    mnemonic_phrase = Mnemonic("english").generate(strength=128)
+    acct = Account.from_mnemonic(mnemonic_phrase, account_path=_DEFAULT_DERIVATION_PATH)
+    address = acct.address.lower()
+
+    encrypted_key = _get_local_encryption().encrypt(acct.key, address)
+    db.add(Wallet(
+        wallet_id=str(uuid.uuid4()), public_address=address,
+        encrypted_private_key=base64.b64encode(encrypted_key).decode("utf-8"),
+        mnemonic_hash=_hash_mnemonic(mnemonic_phrase),
+        derivation_path=_DEFAULT_DERIVATION_PATH, key_version=1,
+        user_id=user.id, wallet_type=wallet_type, activation_status="created",
+    ))
+    user.wallet_address = address
+    db.commit()
+    logger.info("Custodial wallet provisioned for user_id=%s address=%s", user.id, address)
+    return address
+
+
+def pay_hua_from_custodial(db, from_user, to_address: str, amount_units: int) -> str:
+    """Transfer `amount_units` (HUA smallest units, 18 decimals) from a user's
+    custodial wallet to `to_address` on the private chain.
+
+    Used to settle task rewards: the publisher's own custodial key signs an
+    ERC-20 transfer (gasPrice 0, no ETH needed). Raises ValueError on any
+    failure (no custodial wallet / would revert / tx reverted) so callers can
+    surface a clear error and avoid marking a task paid when it wasn't.
+    """
+    from web3 import Web3
+    from blockchain.web3_config import get_web3_config
+    from models.database import Wallet
+
+    config = get_web3_config()
+    if config.hua_contract is None:
+        raise ValueError("华币合约未配置或链不可用")
+
+    wallet = (
+        db.query(Wallet)
+        .filter(Wallet.user_id == from_user.id, Wallet.encrypted_private_key.isnot(None))
+        .order_by(Wallet.created_at.desc())
+        .first()
+    )
+    if wallet is None or not wallet.encrypted_private_key:
+        raise ValueError("发布方没有可代签的平台托管钱包，无法支付奖励")
+
+    w3 = config.w3
+    from_addr = Web3.to_checksum_address(wallet.public_address)
+    to_addr = Web3.to_checksum_address(to_address)
+
+    # Pre-flight via eth_call so an insufficient-balance transfer surfaces as a
+    # clear error instead of broadcasting a tx that silently reverts on-chain.
+    try:
+        config.hua_contract.functions.transfer(to_addr, amount_units).call({"from": from_addr})
+    except Exception as exc:
+        raise ValueError(f"奖励支付无法完成（余额不足或被合约拒绝）：{exc}") from exc
+
+    tx = config.hua_contract.functions.transfer(to_addr, amount_units).build_transaction({
+        "from": from_addr,
+        "nonce": w3.eth.get_transaction_count(from_addr, "pending"),
+        "gas": 100000,
+        "gasPrice": 0,
+        "chainId": config.chain_id,
+    })
+    pk = _get_local_encryption().decrypt(
+        base64.b64decode(wallet.encrypted_private_key), wallet.public_address
+    )
+    signed = w3.eth.account.sign_transaction(tx, pk)
+    tx_hash = w3.eth.send_raw_transaction(signed.raw_transaction)
+    receipt = w3.eth.wait_for_transaction_receipt(tx_hash, timeout=60)
+    if receipt["status"] != 1:
+        raise ValueError("奖励支付交易上链失败（status=0）")
+    return tx_hash.hex() if hasattr(tx_hash, "hex") else str(tx_hash)
 
 
 def _zero_bytes(data: bytes) -> None:

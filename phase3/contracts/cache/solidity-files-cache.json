@@ -1,10 +1,10 @@
 {
   "_format": "hh-sol-cache-2",
   "files": {
-    "C:\\Users\\chunx\\Projects\\nautilus-core\\phase3\\contracts\\src\\IdentityContract.sol": {
-      "lastModificationDate": 1771463767571,
-      "contentHash": "b57624e128892d9e569e62ef4ca91519",
-      "sourceName": "src/IdentityContract.sol",
+    "C:\\code\\Nautilus\\phase3\\contracts\\src\\HuaCoin.sol": {
+      "lastModificationDate": 1782314500039,
+      "contentHash": "a22da6c5a5b2ab3adcba2ec503f60be4",
+      "sourceName": "src/HuaCoin.sol",
       "solcConfig": {
         "version": "0.8.21",
         "settings": {
@@ -31,17 +31,18 @@
         }
       },
       "imports": [
+        "@openzeppelin/contracts/token/ERC20/ERC20.sol",
         "@openzeppelin/contracts/access/Ownable.sol"
       ],
       "versionPragmas": [
         "^0.8.21"
       ],
       "artifacts": [
-        "IdentityContract"
+        "HuaCoin"
       ]
     },
-    "C:\\Users\\chunx\\Projects\\nautilus-core\\phase3\\contracts\\node_modules\\@openzeppelin\\contracts\\access\\Ownable.sol": {
-      "lastModificationDate": 1774003703449,
+    "C:\\code\\Nautilus\\phase3\\contracts\\node_modules\\@openzeppelin\\contracts\\access\\Ownable.sol": {
+      "lastModificationDate": 1782314606210,
       "contentHash": "d3c790edc9ccf808a17c5a6cd13614fd",
       "sourceName": "@openzeppelin/contracts/access/Ownable.sol",
       "solcConfig": {
@@ -79,45 +80,8 @@
         "Ownable"
       ]
     },
-    "C:\\Users\\chunx\\Projects\\nautilus-core\\phase3\\contracts\\node_modules\\@openzeppelin\\contracts\\utils\\Context.sol": {
-      "lastModificationDate": 1774003703019,
-      "contentHash": "67bfbc07588eb8683b3fd8f6f909563e",
-      "sourceName": "@openzeppelin/contracts/utils/Context.sol",
-      "solcConfig": {
-        "version": "0.8.21",
-        "settings": {
-          "viaIR": true,
-          "optimizer": {
-            "enabled": true,
-            "runs": 200
-          },
-          "evmVersion": "paris",
-          "outputSelection": {
-            "*": {
-              "*": [
-                "abi",
-                "evm.bytecode",
-                "evm.deployedBytecode",
-                "evm.methodIdentifiers",
-                "metadata"
-              ],
-              "": [
-                "ast"
-              ]
-            }
-          }
-        }
-      },
-      "imports": [],
-      "versionPragmas": [
-        "^0.8.20"
-      ],
-      "artifacts": [
-        "Context"
-      ]
-    },
-    "C:\\Users\\chunx\\Projects\\nautilus-core\\phase3\\contracts\\node_modules\\@openzeppelin\\contracts\\token\\ERC20\\ERC20.sol": {
-      "lastModificationDate": 1774003703121,
+    "C:\\code\\Nautilus\\phase3\\contracts\\node_modules\\@openzeppelin\\contracts\\token\\ERC20\\ERC20.sol": {
+      "lastModificationDate": 1782314605598,
       "contentHash": "d15c4d05583536e080f1960ab282772d",
       "sourceName": "@openzeppelin/contracts/token/ERC20/ERC20.sol",
       "solcConfig": {
@@ -158,8 +122,45 @@
         "ERC20"
       ]
     },
-    "C:\\Users\\chunx\\Projects\\nautilus-core\\phase3\\contracts\\node_modules\\@openzeppelin\\contracts\\token\\ERC20\\IERC20.sol": {
-      "lastModificationDate": 1774003703354,
+    "C:\\code\\Nautilus\\phase3\\contracts\\node_modules\\@openzeppelin\\contracts\\utils\\Context.sol": {
+      "lastModificationDate": 1782314605043,
+      "contentHash": "67bfbc07588eb8683b3fd8f6f909563e",
+      "sourceName": "@openzeppelin/contracts/utils/Context.sol",
+      "solcConfig": {
+        "version": "0.8.21",
+        "settings": {
+          "viaIR": true,
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "evmVersion": "paris",
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        "^0.8.20"
+      ],
+      "artifacts": [
+        "Context"
+      ]
+    },
+    "C:\\code\\Nautilus\\phase3\\contracts\\node_modules\\@openzeppelin\\contracts\\token\\ERC20\\IERC20.sol": {
+      "lastModificationDate": 1782314606019,
       "contentHash": "9261adf6457863de3e9892f51317ec89",
       "sourceName": "@openzeppelin/contracts/token/ERC20/IERC20.sol",
       "solcConfig": {
@@ -195,8 +196,8 @@
         "IERC20"
       ]
     },
-    "C:\\Users\\chunx\\Projects\\nautilus-core\\phase3\\contracts\\node_modules\\@openzeppelin\\contracts\\interfaces\\draft-IERC6093.sol": {
-      "lastModificationDate": 1774003703061,
+    "C:\\code\\Nautilus\\phase3\\contracts\\node_modules\\@openzeppelin\\contracts\\interfaces\\draft-IERC6093.sol": {
+      "lastModificationDate": 1782314605161,
       "contentHash": "bcc76f4747d56c28c40ae272ef3470a6",
       "sourceName": "@openzeppelin/contracts/interfaces/draft-IERC6093.sol",
       "solcConfig": {
@@ -234,8 +235,8 @@
         "IERC721Errors"
       ]
     },
-    "C:\\Users\\chunx\\Projects\\nautilus-core\\phase3\\contracts\\node_modules\\@openzeppelin\\contracts\\token\\ERC20\\extensions\\IERC20Metadata.sol": {
-      "lastModificationDate": 1774003703360,
+    "C:\\code\\Nautilus\\phase3\\contracts\\node_modules\\@openzeppelin\\contracts\\token\\ERC20\\extensions\\IERC20Metadata.sol": {
+      "lastModificationDate": 1782314606028,
       "contentHash": "513778b30d2750f5d2b9b19bbcf748a5",
       "sourceName": "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol",
       "solcConfig": {
@@ -273,8 +274,8 @@
         "IERC20Metadata"
       ]
     },
-    "C:\\Users\\chunx\\Projects\\nautilus-core\\phase3\\contracts\\node_modules\\@openzeppelin\\contracts\\interfaces\\IERC20.sol": {
-      "lastModificationDate": 1774003703352,
+    "C:\\code\\Nautilus\\phase3\\contracts\\node_modules\\@openzeppelin\\contracts\\interfaces\\IERC20.sol": {
+      "lastModificationDate": 1782314606013,
       "contentHash": "68620db2da7583d9a4919096ac77f577",
       "sourceName": "@openzeppelin/contracts/interfaces/IERC20.sol",
       "solcConfig": {
@@ -310,8 +311,8 @@
       ],
       "artifacts": []
     },
-    "C:\\Users\\chunx\\Projects\\nautilus-core\\phase3\\contracts\\node_modules\\@openzeppelin\\contracts\\interfaces\\IERC1363.sol": {
-      "lastModificationDate": 1774003703293,
+    "C:\\code\\Nautilus\\phase3\\contracts\\node_modules\\@openzeppelin\\contracts\\interfaces\\IERC1363.sol": {
+      "lastModificationDate": 1782314605988,
       "contentHash": "a7fd0f05e36b0d0a21c75340c9c639ec",
       "sourceName": "@openzeppelin/contracts/interfaces/IERC1363.sol",
       "solcConfig": {
@@ -350,8 +351,8 @@
         "IERC1363"
       ]
     },
-    "C:\\Users\\chunx\\Projects\\nautilus-core\\phase3\\contracts\\node_modules\\@openzeppelin\\contracts\\interfaces\\IERC165.sol": {
-      "lastModificationDate": 1774003703297,
+    "C:\\code\\Nautilus\\phase3\\contracts\\node_modules\\@openzeppelin\\contracts\\interfaces\\IERC165.sol": {
+      "lastModificationDate": 1782314605998,
       "contentHash": "947853028399b7de34bcc3704ee06e99",
       "sourceName": "@openzeppelin/contracts/interfaces/IERC165.sol",
       "solcConfig": {
@@ -387,8 +388,8 @@
       ],
       "artifacts": []
     },
-    "C:\\Users\\chunx\\Projects\\nautilus-core\\phase3\\contracts\\node_modules\\@openzeppelin\\contracts\\utils\\introspection\\IERC165.sol": {
-      "lastModificationDate": 1774003703319,
+    "C:\\code\\Nautilus\\phase3\\contracts\\node_modules\\@openzeppelin\\contracts\\utils\\introspection\\IERC165.sol": {
+      "lastModificationDate": 1782314606001,
       "contentHash": "7074c93b1ea0a122063f26ddd1db1032",
       "sourceName": "@openzeppelin/contracts/utils/introspection/IERC165.sol",
       "solcConfig": {
@@ -424,8 +425,8 @@
         "IERC165"
       ]
     },
-    "C:\\Users\\chunx\\Projects\\nautilus-core\\phase3\\contracts\\node_modules\\@openzeppelin\\contracts\\token\\ERC20\\utils\\SafeERC20.sol": {
-      "lastModificationDate": 1774003703475,
+    "C:\\code\\Nautilus\\phase3\\contracts\\node_modules\\@openzeppelin\\contracts\\token\\ERC20\\utils\\SafeERC20.sol": {
+      "lastModificationDate": 1782314606284,
       "contentHash": "bf8e9c3398d381dc66c5302267927386",
       "sourceName": "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol",
       "solcConfig": {
@@ -464,8 +465,8 @@
         "SafeERC20"
       ]
     },
-    "C:\\Users\\chunx\\Projects\\nautilus-core\\phase3\\contracts\\src\\TaskContract.sol": {
-      "lastModificationDate": 1774003731214,
+    "C:\\code\\Nautilus\\phase3\\contracts\\src\\TaskContract.sol": {
+      "lastModificationDate": 1782311228347,
       "contentHash": "9dbf5b25ef03594d6f5350a31e66c10b",
       "sourceName": "src/TaskContract.sol",
       "solcConfig": {
@@ -506,8 +507,8 @@
         "TaskContract"
       ]
     },
-    "C:\\Users\\chunx\\Projects\\nautilus-core\\phase3\\contracts\\node_modules\\@openzeppelin\\contracts\\utils\\ReentrancyGuard.sol": {
-      "lastModificationDate": 1774003703462,
+    "C:\\code\\Nautilus\\phase3\\contracts\\node_modules\\@openzeppelin\\contracts\\utils\\ReentrancyGuard.sol": {
+      "lastModificationDate": 1782314606252,
       "contentHash": "6e5efb502dd6652d12ad15eea2c5bdf4",
       "sourceName": "@openzeppelin/contracts/utils/ReentrancyGuard.sol",
       "solcConfig": {
@@ -545,8 +546,8 @@
         "ReentrancyGuard"
       ]
     },
-    "C:\\Users\\chunx\\Projects\\nautilus-core\\phase3\\contracts\\node_modules\\@openzeppelin\\contracts\\utils\\StorageSlot.sol": {
-      "lastModificationDate": 1774003703499,
+    "C:\\code\\Nautilus\\phase3\\contracts\\node_modules\\@openzeppelin\\contracts\\utils\\StorageSlot.sol": {
+      "lastModificationDate": 1782314606334,
       "contentHash": "e656d64c4ce918f3d13030b91c935134",
       "sourceName": "@openzeppelin/contracts/utils/StorageSlot.sol",
       "solcConfig": {
@@ -582,8 +583,47 @@
         "StorageSlot"
       ]
     },
-    "C:\\Users\\chunx\\Projects\\nautilus-core\\phase3\\contracts\\src\\RewardContract.sol": {
-      "lastModificationDate": 1774003448149,
+    "C:\\code\\Nautilus\\phase3\\contracts\\src\\WalletRegistry.sol": {
+      "lastModificationDate": 1782311228347,
+      "contentHash": "74669ab8744899571baf55171c767410",
+      "sourceName": "src/WalletRegistry.sol",
+      "solcConfig": {
+        "version": "0.8.21",
+        "settings": {
+          "viaIR": true,
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "evmVersion": "paris",
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [
+        "@openzeppelin/contracts/access/Ownable.sol"
+      ],
+      "versionPragmas": [
+        "^0.8.21"
+      ],
+      "artifacts": [
+        "WalletRegistry"
+      ]
+    },
+    "C:\\code\\Nautilus\\phase3\\contracts\\src\\RewardContract.sol": {
+      "lastModificationDate": 1782311228347,
       "contentHash": "df0be8746bc47d42fc8ef2caf2a8c640",
       "sourceName": "src/RewardContract.sol",
       "solcConfig": {
@@ -624,48 +664,9 @@
         "RewardContract"
       ]
     },
-    "C:\\Users\\chunx\\Projects\\nautilus-core\\phase3\\contracts\\src\\mocks\\MockERC20.sol": {
-      "lastModificationDate": 1774003601259,
-      "contentHash": "63d56fb45d18d0396d83d2631cbe0bdf",
-      "sourceName": "src/mocks/MockERC20.sol",
-      "solcConfig": {
-        "version": "0.8.21",
-        "settings": {
-          "viaIR": true,
-          "optimizer": {
-            "enabled": true,
-            "runs": 200
-          },
-          "evmVersion": "paris",
-          "outputSelection": {
-            "*": {
-              "*": [
-                "abi",
-                "evm.bytecode",
-                "evm.deployedBytecode",
-                "evm.methodIdentifiers",
-                "metadata"
-              ],
-              "": [
-                "ast"
-              ]
-            }
-          }
-        }
-      },
-      "imports": [
-        "@openzeppelin/contracts/token/ERC20/ERC20.sol"
-      ],
-      "versionPragmas": [
-        "^0.8.21"
-      ],
-      "artifacts": [
-        "MockERC20"
-      ]
-    },
-    "C:\\Users\\chunx\\Projects\\nautilus-core\\phase3\\contracts\\src\\NautilusToken.sol": {
-      "lastModificationDate": 1774941347452,
-      "contentHash": "ba7aea76c8d5b86d58bf8bb22f2f0892",
+    "C:\\code\\Nautilus\\phase3\\contracts\\src\\NautilusToken.sol": {
+      "lastModificationDate": 1782311228345,
+      "contentHash": "2857a9fb6f54503308b1840730f8de11",
       "sourceName": "src/NautilusToken.sol",
       "solcConfig": {
         "version": "0.8.21",
@@ -703,10 +704,10 @@
         "NautilusToken"
       ]
     },
-    "C:\\Users\\chunx\\Projects\\nautilus-core\\phase3\\contracts\\src\\WalletRegistry.sol": {
-      "lastModificationDate": 1774192228964,
-      "contentHash": "32d45d8b01a53da6b14203520dcf2d73",
-      "sourceName": "src/WalletRegistry.sol",
+    "C:\\code\\Nautilus\\phase3\\contracts\\src\\IdentityContract.sol": {
+      "lastModificationDate": 1782311228345,
+      "contentHash": "b57624e128892d9e569e62ef4ca91519",
+      "sourceName": "src/IdentityContract.sol",
       "solcConfig": {
         "version": "0.8.21",
         "settings": {
@@ -739,7 +740,46 @@
         "^0.8.21"
       ],
       "artifacts": [
-        "WalletRegistry"
+        "IdentityContract"
+      ]
+    },
+    "C:\\code\\Nautilus\\phase3\\contracts\\src\\mocks\\MockERC20.sol": {
+      "lastModificationDate": 1782311228349,
+      "contentHash": "63d56fb45d18d0396d83d2631cbe0bdf",
+      "sourceName": "src/mocks/MockERC20.sol",
+      "solcConfig": {
+        "version": "0.8.21",
+        "settings": {
+          "viaIR": true,
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "evmVersion": "paris",
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [
+        "@openzeppelin/contracts/token/ERC20/ERC20.sol"
+      ],
+      "versionPragmas": [
+        "^0.8.21"
+      ],
+      "artifacts": [
+        "MockERC20"
       ]
     }
   }

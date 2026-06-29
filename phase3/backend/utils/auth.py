@@ -118,7 +118,6 @@ async def get_current_user(
         record_security_event(
             event_type="permission_denied",
             severity="warning",
-            details={"username": username, "reason": "inactive_user"}
         )
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -210,7 +209,6 @@ async def get_current_admin_user(
         record_security_event(
             event_type="permission_denied",
             severity="warning",
-            details={"username": current_user.username, "reason": "not_admin"}
         )
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

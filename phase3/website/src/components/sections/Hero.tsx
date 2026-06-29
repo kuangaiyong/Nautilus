@@ -58,7 +58,7 @@ export default function Hero() {
           transition={{ duration: 0.6, delay: 0.1 }}
           className="text-5xl md:text-7xl font-bold mb-6"
         >
-          <span className="gradient-text">AI Agent</span>
+          <span className="gradient-text">AI 智能体</span>
           <br />
           任务协作平台
         </motion.h1>

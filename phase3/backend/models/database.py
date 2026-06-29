@@ -4,12 +4,30 @@ Database models for Nautilus Phase 3.
 from datetime import datetime
 from typing import Optional
 from sqlalchemy import Column, Integer, String, BigInteger, Float, DateTime, Text, Enum, ForeignKey, Boolean, JSON, Index, UniqueConstraint
+from sqlalchemy.types import TypeDecorator
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 import enum
 import uuid
 
 Base = declarative_base()
+
+
+class WeiInt(TypeDecorator):
+    """以文本存储的大整数（18 位精度代币的 wei，可达 uint256）。
+
+    BigInteger 在 SQLite / PostgreSQL 上都是 64 位有符号整数（上限约 9.22e18，
+    即 ~9.22 个 18 位代币），任意 ≥ ~9.22 华币的金额都会溢出。以 String 存储
+    十进制字符串可精确保存任意大小，Python 侧仍以 int 读写，算术与原来一致。
+    """
+    impl = String(80)  # 足够容纳 uint256（最多 78 位）+ 符号余量
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        return None if value is None else str(int(value))
+
+    def process_result_value(self, value, dialect):
+        return None if value is None else int(value)
 
 
 class TaskType(enum.Enum):
@@ -44,7 +62,7 @@ class Task(Base):
     description = Column(Text, nullable=False)
     input_data = Column(Text)
     expected_output = Column(Text)
-    reward = Column(BigInteger, nullable=False)  # Wei
+    reward = Column(WeiInt, nullable=False)  # Wei
     task_type = Column(Enum(TaskType, name='tasktype'), nullable=False, index=True)
     status = Column(Enum(TaskStatus, name='taskstatus'), nullable=False, index=True)
     agent = Column(String(42), index=True)
@@ -66,8 +84,8 @@ class Task(Base):
 
     # Gas fee sharing fields (Phase 3)
     gas_used = Column(BigInteger)  # Total gas used for all transactions
-    gas_cost = Column(BigInteger)  # Total gas cost in Wei
-    gas_split = Column(BigInteger)  # Agent's share of gas cost (50%)
+    gas_cost = Column(WeiInt)  # Total gas cost in Wei
+    gas_split = Column(WeiInt)  # Agent's share of gas cost (50%)
 
     # Relationships
     verification_logs = relationship("VerificationLog", back_populates="task")
@@ -97,7 +115,7 @@ class Agent(Base):
     current_tasks = Column(Integer, default=0)
     completed_tasks = Column(Integer, default=0)
     failed_tasks = Column(Integer, default=0)
-    total_earnings = Column(BigInteger, default=0)  # Wei
+    total_earnings = Column(BigInteger, default=0)  # Wei（用于排行榜 ORDER BY 与平台 SUM，保留 64 位整数以确保数值排序/聚合正确）
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
     # Blockchain integration fields (Phase 2)
@@ -123,7 +141,7 @@ class Reward(Base):
     id = Column(Integer, primary_key=True, index=True)
     task_id = Column(String(66), nullable=False, index=True)
     agent = Column(String(42), nullable=False, index=True)
-    amount = Column(BigInteger, nullable=False)  # Wei
+    amount = Column(BigInteger, nullable=False)  # Wei（rewards 表被 func.sum 聚合，保留 64 位整数以确保 SUM 精确）
     status = Column(String(20), nullable=False, index=True)  # Pending, Distributed, Withdrawn
     distributed_at = Column(DateTime, index=True)
     withdrawn_at = Column(DateTime)
@@ -175,7 +193,7 @@ class APIKey(Base):
     __tablename__ = "api_keys"
 
     id = Column(Integer, primary_key=True, index=True)
-    key = Column(String(64), unique=True, nullable=False, index=True)
+    key = Column(String(80), unique=True, nullable=False, index=True)  # 实际密钥 68 位，留余量（SQLite 不校验长度，MySQL 校验）
     agent_id = Column(Integer, ForeignKey("agents.agent_id"), nullable=False, index=True)
     name = Column(String(100), nullable=False)
     is_active = Column(Boolean, default=True, index=True)
@@ -378,7 +396,7 @@ class TaskBid(Base):
     __tablename__ = "task_bids"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    task_id = Column(String, ForeignKey("academic_tasks.task_id"), nullable=False, index=True)
+    task_id = Column(String(50), ForeignKey("academic_tasks.task_id"), nullable=False, index=True)
     agent_id = Column(Integer, ForeignKey("agents.agent_id"), nullable=False, index=True)
     bid_nau = Column(Float, nullable=False)           # 报价 NAU
     estimated_minutes = Column(Integer, default=10)   # 预估完成时间

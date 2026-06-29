@@ -78,7 +78,7 @@ def record_evolution(db: Session, proposal_id: str, sandbox_result: Dict[str, An
                 change_type, proposed_change, sandbox_result, metric_delta,
                 nau_rewarded, status)
                VALUES (:id, :proposal_id, :proposer_agent_id, :version_str, :minor_version,
-                       :change_type, CAST(:proposed_change AS jsonb), CAST(:sandbox_result AS jsonb),
+                       :change_type, :proposed_change, :sandbox_result,
                        :metric_delta, :nau_rewarded, 'active')"""
         ), {
             "id": entry_id,

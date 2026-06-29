@@ -77,10 +77,16 @@ async def _subscriber_loop() -> None:
         logger.error(f"Event bus subscriber crashed: {e}")
 
 
+# 持有订阅任务的强引用，避免被 asyncio GC（否则 _subscriber_loop 真正阻塞在
+# listen() 后会被回收，触发 "Task was destroyed but it is pending"，订阅静默停止）。
+_subscriber_task: asyncio.Task | None = None
+
+
 def start_subscriber() -> asyncio.Task:
     """启动订阅器，在后台运行，不阻塞主进程"""
-    task = asyncio.create_task(_subscriber_loop())
-    return task
+    global _subscriber_task
+    _subscriber_task = asyncio.create_task(_subscriber_loop())
+    return _subscriber_task
 
 
 # 预定义事件常量

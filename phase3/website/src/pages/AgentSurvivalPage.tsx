@@ -78,7 +78,7 @@ export default function AgentSurvivalPage() {
     return (
       <div className="max-w-6xl mx-auto px-4 py-8">
         <div className="bg-white rounded-lg shadow-sm p-12 text-center">
-          <p className="text-gray-500">Survival data not found</p>
+          <p className="text-gray-500">未找到生存数据</p>
         </div>
       </div>
     )
@@ -125,7 +125,7 @@ export default function AgentSurvivalPage() {
             <Tooltip />
             <Legend />
             <Line yAxisId="left" type="monotone" dataKey="balance" stroke="#8884d8" name="余额" />
-            <Line yAxisId="right" type="monotone" dataKey="roi" stroke="#82ca9d" name="ROI" />
+            <Line yAxisId="right" type="monotone" dataKey="roi" stroke="#16a34a" name="ROI" />
           </LineChart>
         </ResponsiveContainer>
       </div>

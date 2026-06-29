@@ -112,51 +112,19 @@ def _make_platform_snapshot_fn():
         try:
             from utils.database import SessionLocal
             from sqlalchemy import text
-            from services.observatory import PlatformObservatory
-            obs = PlatformObservatory()
+            # 与仪表盘口径一致：基于 DMAS tasks 计算（私有网络的真实任务系统），
+            # 复用 api/platform.py 的 canonical helpers。避免用 academic_tasks(当前为空)
+            # 算出 health=0 的快照覆盖仪表盘（snapshot-first 读最新一条）。
+            from api.platform import _compute_metrics, _health_score, _detect_anomalies
             db = SessionLocal()
             try:
-                def _q(sql, params=None):
-                    try:
-                        return db.execute(text(sql), params or {})
-                    except Exception:
-                        try: db.rollback()
-                        except Exception: pass
-                        raise
-
-                total_agents = _q("SELECT COUNT(*) FROM agents").scalar() or 0
-                active_24h = _q(
-                    "SELECT COUNT(DISTINCT assigned_agent_id) FROM academic_tasks "
-                    "WHERE created_at > NOW() - INTERVAL '24 hours' AND status='completed'"
-                ).scalar() or 0
-                row = _q(
-                    "SELECT COUNT(*) AS total, "
-                    "SUM(CASE WHEN status='completed' THEN 1 ELSE 0 END) AS done, "
-                    "SUM(CASE WHEN status='failed' THEN 1 ELSE 0 END) AS failed, "
-                    "AVG(quality_rating) AS avg_q, "
-                    "COALESCE(SUM(token_reward),0) AS nau "
-                    "FROM academic_tasks WHERE created_at > NOW() - INTERVAL '24 hours'"
-                ).fetchone()
-                done_t = int(row.done or 0)
-                fail_t = int(row.failed or 0)
-                total_t = done_t + fail_t
-                metrics = {
-                    "total_agents": int(total_agents),
-                    "active_agents_24h": int(active_24h),
-                    "tasks_completed_24h": done_t,
-                    "task_success_rate": (done_t / total_t) if total_t else None,
-                    "avg_quality_rating": float(row.avg_q) if row.avg_q else None,
-                    "nau_minted_24h": float(row.nau or 0),
-                }
-                anomalies = obs.detect_anomalies(metrics)
-                health_score = obs.get_health_score(metrics)
-                _q(
+                metrics = _compute_metrics(db)
+                health_score = _health_score(metrics)
+                anomalies = _detect_anomalies(metrics)
+                db.execute(text(
                     "INSERT INTO platform_metrics_snapshots (metrics, anomalies, health_score) "
-                    "VALUES (:m, :a, :h)",
-                    {"m": _json.dumps(metrics),
-                     "a": _json.dumps([a.__dict__ for a in anomalies]),
-                     "h": health_score}
-                )
+                    "VALUES (:m, :a, :h)"),
+                    {"m": _json.dumps(metrics), "a": _json.dumps(anomalies), "h": health_score})
                 db.commit()
                 logger.info("observatory snapshot: health=%.1f anomalies=%d", health_score, len(anomalies))
             finally:
@@ -179,7 +147,7 @@ def _make_anomaly_detection_fn():
                 new_metas = db.execute(text(
                     "SELECT task_id, title FROM academic_tasks "
                     "WHERE task_type='platform_meta' "
-                    "AND created_at >= NOW() - INTERVAL '2 minutes' "
+                    "AND created_at >= NOW() - INTERVAL 2 MINUTE "
                     "ORDER BY created_at DESC LIMIT 5"
                 )).fetchall()
                 if new_metas:
@@ -207,7 +175,7 @@ def _make_autodream_fn():
                 rows = db.execute(text(
                     "SELECT metrics, health_score, snapshot_time "
                     "FROM platform_metrics_snapshots "
-                    "WHERE snapshot_time >= NOW() - INTERVAL '24 hours' "
+                    "WHERE snapshot_time >= NOW() - INTERVAL 24 HOUR "
                     "ORDER BY snapshot_time ASC"
                 )).fetchall()
 
@@ -245,10 +213,13 @@ def _make_autodream_fn():
                     ),
                 }
 
+                # MySQL：jsonb 合并用 JSON_MERGE_PATCH；且不能在 UPDATE 同表的子查询里直接 SELECT 该表，
+                # 用派生表(SELECT ... AS t)包一层规避 "can't specify target table for update"。
                 db.execute(text(
                     "UPDATE platform_metrics_snapshots "
-                    "SET metrics = metrics || CAST(:dream_json AS jsonb) "
-                    "WHERE id = (SELECT id FROM platform_metrics_snapshots ORDER BY snapshot_time DESC LIMIT 1)"
+                    "SET metrics = JSON_MERGE_PATCH(metrics, :dream_json) "
+                    "WHERE id = (SELECT id FROM (SELECT id FROM platform_metrics_snapshots "
+                    "ORDER BY snapshot_time DESC LIMIT 1) AS t)"
                 ), {"dream_json": json.dumps({"_autodream": summary})})
                 db.commit()
 
@@ -320,7 +291,7 @@ def _make_sandbox_monitor_fn(db_factory):
                         # 延长 24h
                         db.execute(
                             __import__('sqlalchemy').text(
-                                "UPDATE sandbox_experiments SET ends_at = NOW() + INTERVAL '24 hours' WHERE id=:id"
+                                "UPDATE sandbox_experiments SET ends_at = NOW() + INTERVAL 24 HOUR WHERE id=:id"
                             ), {"id": exp.id}
                         )
                         db.commit()

@@ -6,7 +6,10 @@
 
 **项目名称**: Nautilus - AI Agent生态系统
 **目标**: 让AI Agent真正"活"起来 - 能赚钱、能进化、能繁衍
-**当前阶段**: Week 2 - 性能优化 + 生存机制实施
+**当前阶段**: 内网私有化（`dev/private-network-port`）—— 私有链 + 华币结算 + LLM 统一网关
+
+> 架构与本机运行方式以仓库根 `CLAUDE.md` 为准；本文件部分历史内容（Base/USDC/
+> PostgreSQL）已被私有化改造取代，下文技术栈/区块链/命令已更新为私有网络口径。
 
 ## 核心规则（必须遵守）
 
@@ -37,17 +40,22 @@
 ## 技术栈
 
 ### Backend
-- Python 3.11+, FastAPI, PostgreSQL, Redis
-- SQLAlchemy (async), Alembic
+- Python 3.11+, FastAPI
+- SQLAlchemy, Alembic（私有化部署的库由 `create_all` 管理，非 Alembic）
+- 数据库：私有网络用 SQLite（`nautilus_private.db`）；公链模式可用 PostgreSQL/Redis
 - Web3.py, eth-account
 
 ### Frontend
-- React 19, TypeScript, Vite
+- React 19, TypeScript, Vite（目录为 `phase3/website`）
 - TailwindCSS, MetaMask
 
-### Blockchain
-- Base Chain (8453)
-- USDC: 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913
+### Blockchain（由 `BLOCKCHAIN_NETWORK` 选择）
+- 私有网络（当前）：原生 geth Clique POA，chainId `13370`，RPC `:8545`
+  - 华币 HUA（18 位精度，结算币）：`0x5FbDB2315678afecb367f032d93F642f64180aa3`
+  - NAU（PoUW 代币）：`0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512`
+  - 结算走 `blockchain/web3_config.py`（`get_web3_config`）；`get_blockchain_service`
+    是遗留 best-effort 层，`/health` 的 chain_id 来自它、非私链
+- 公链（历史）：Base Chain (8453)，USDC `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913`
 
 ## 质量标准
 
@@ -116,18 +124,19 @@ raise HTTPException(
 ## 快速命令
 
 ```bash
-# Backend
-cd backend && uvicorn main:app --reload
-pytest --cov=. --cov-report=html
-alembic upgrade head
+# Backend（私有网络模式：用 venv，CWD=phase3/backend，无 --reload，改动需重启）
+C:/nautilus-venv/Scripts/python.exe -m uvicorn main:app --host 127.0.0.1 --port 8000
+C:/nautilus-venv/Scripts/python.exe -m pytest tests/                 # 全量
+C:/nautilus-venv/Scripts/python.exe tests/e2e_task_lifecycle.py      # 端到端：发布→抢单→实现→评审→奖励
+# 存量 SQLite 库结构变更用独立脚本（非 alembic），改前备份 .db：
+#   C:/nautilus-venv/Scripts/python.exe migrate_wei_columns.py
+
+# 私链（原生 geth，5 签名节点）
+powershell C:\nautilus-privatechain\start-geth.ps1     # node1（RPC :8545）
+powershell C:\nautilus-privatechain\start-nodes.ps1    # node2~5，启动后需手动 addPeer 互联
 
 # Frontend
-cd frontend && npm run dev
-npm run build
-npm test
-
-# Performance
-python backend/tests/test_wallet_performance.py
+cd website && npm run dev
 ```
 
 ## 重要文档
@@ -139,9 +148,9 @@ python backend/tests/test_wallet_performance.py
 
 ## 当前状态
 
-**Week 1**: ✅ 完成，已部署
-**Week 2 Phase 1**: 🚀 进行中（性能优化，2天）
-**Week 2 Phase 2**: 📋 待启动（生存机制，3天）
+**内网私有化改造**：私有链（geth POA / chainId 13370）+ 华币结算 + LLM 统一网关已落地。
+核心任务生命周期（发布→抢单→实现→评审→链上华币奖励）已端到端验证，回归脚本见
+`backend/tests/e2e_task_lifecycle.py`。
 
 ## 联系方式
 

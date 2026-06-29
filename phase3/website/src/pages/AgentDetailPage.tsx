@@ -5,7 +5,7 @@ interface Agent {
   id: number
   name: string
   description?: string
-  specialties?: string[]
+  specialties?: string[] | string
   reputation: number
   tasks_completed: number
   tasks_failed: number
@@ -72,18 +72,23 @@ const BASESCAN_TX_URL = 'https://basescan.org/tx/'
 const NAU_HISTORY_DISPLAY_LIMIT = 10
 
 const TASK_TYPE_LABELS: Record<string, string> = {
-  curve_fitting: 'Curve Fitting',
-  ode_simulation: 'ODE',
-  pde_simulation: 'PDE',
-  monte_carlo: 'Monte Carlo',
-  statistical_analysis: 'Statistics',
-  ml_training: 'ML Training',
-  data_visualization: 'Visualization',
-  physics_simulation: 'Physics',
-  general_computation: 'Computation',
-  jc_constitutive: 'JC Model',
-  thmc_coupling: 'THMC',
-  research_synthesis: 'Research',
+  curve_fitting: '曲线拟合',
+  ode_simulation: 'ODE 仿真',
+  pde_simulation: 'PDE 仿真',
+  monte_carlo: '蒙特卡洛',
+  statistical_analysis: '统计分析',
+  ml_training: '机器学习训练',
+  data_visualization: '数据可视化',
+  physics_simulation: '物理仿真',
+  general_computation: '通用计算',
+  jc_constitutive: 'J-C 本构模型',
+  thmc_coupling: 'THMC 耦合',
+  research_synthesis: '研究综合',
+}
+
+const STATUS_LABELS: Record<string, string> = {
+  OPEN: '开放中', ACCEPTED: '已接单', SUBMITTED: '已提交',
+  VERIFIED: '已验证', COMPLETED: '已完成', FAILED: '失败', DISPUTED: '申诉中',
 }
 
 export default function AgentDetailPage() {
@@ -170,12 +175,12 @@ export default function AgentDetailPage() {
   }
 
   const getReputationLevel = () => {
-    if (!agent) return 'Beginner'
-    if (agent.reputation >= 200) return 'Master'
-    if (agent.reputation >= 150) return 'Expert'
-    if (agent.reputation >= 100) return 'Advanced'
-    if (agent.reputation >= 50) return 'Intermediate'
-    return 'Beginner'
+    if (!agent) return '新手'
+    if (agent.reputation >= 200) return '大师'
+    if (agent.reputation >= 150) return '专家'
+    if (agent.reputation >= 100) return '高级'
+    if (agent.reputation >= 50) return '中级'
+    return '新手'
   }
 
   if (loading) {
@@ -190,7 +195,7 @@ export default function AgentDetailPage() {
     return (
       <div className="max-w-4xl mx-auto px-4 py-8">
         <div className="bg-white rounded-lg shadow-sm p-12 text-center">
-          <p className="text-gray-500">Agent not found</p>
+          <p className="text-gray-500">智能体不存在</p>
         </div>
       </div>
     )
@@ -198,13 +203,13 @@ export default function AgentDetailPage() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
-      <button onClick={() => navigate('/agents')} className="mb-6 text-indigo-600 hover:text-indigo-700">← Back to Agents</button>
+      <button onClick={() => navigate('/agents')} className="mb-6 text-indigo-600 hover:text-indigo-700">← 返回智能体列表</button>
 
       <div className="bg-white rounded-lg shadow-sm p-8 mb-6">
         <div className="flex justify-between items-start mb-6">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 mb-2">{agent.name}</h1>
-            <p className="text-gray-500">Agent #{agent.id}</p>
+            <p className="text-gray-500">智能体 #{agent.id}</p>
           </div>
           <div className="text-right">
             <p className="text-3xl font-bold text-indigo-600">{agent.reputation}</p>
@@ -214,11 +219,18 @@ export default function AgentDetailPage() {
 
         {agent.description && <p className="text-gray-700 mb-6">{agent.description}</p>}
 
-        {agent.specialties && agent.specialties.length > 0 && (
-          <div className="flex flex-wrap gap-2 mb-6">
-            {agent.specialties.map((s, i) => <span key={i} className="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-sm font-medium">{s}</span>)}
-          </div>
-        )}
+        {(() => {
+          const specs = Array.isArray(agent.specialties)
+            ? agent.specialties
+            : typeof agent.specialties === 'string'
+              ? agent.specialties.split(',').map(s => s.trim()).filter(Boolean)
+              : []
+          return specs.length > 0 ? (
+            <div className="flex flex-wrap gap-2 mb-6">
+              {specs.map((s, i) => <span key={i} className="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-sm font-medium">{s}</span>)}
+            </div>
+          ) : null
+        })()}
 
         <div className="grid grid-cols-5 gap-4 mb-6">
           <div className="bg-gray-50 p-4 rounded-lg text-center">
@@ -245,7 +257,7 @@ export default function AgentDetailPage() {
               </>
             ) : (
               <>
-                <p className="text-2xl font-bold text-gray-300">—</p>
+                <p className="text-2xl font-bold text-gray-400">—</p>
                 <p className="text-sm text-gray-500">NAU 余额</p>
               </>
             )}
@@ -377,24 +389,24 @@ export default function AgentDetailPage() {
       {skills.length > 0 && (
         <div className="bg-white rounded-lg shadow-sm p-8 mb-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold text-gray-900">Marketplace Skills</h2>
-            <Link to="/skills" className="text-xs text-indigo-500 hover:underline">View all</Link>
+            <h2 className="text-xl font-bold text-gray-900">技能市场</h2>
+            <Link to="/skills" className="text-xs text-indigo-500 hover:underline">查看全部</Link>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {skills.slice(0, 4).map(s => (
               <div key={s.id} className="border border-gray-200 rounded-xl p-4 hover:border-indigo-300 transition-colors">
                 <div className="flex items-start justify-between mb-2">
                   <span className="text-xs px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded-full font-medium">
-                    {s.task_type.replace(/_/g,' ')}
+                    {TASK_TYPE_LABELS[s.task_type] ?? s.task_type.replace(/_/g,' ')}
                   </span>
-                  <span className="text-xs text-gray-400">{s.total_hires} hires</span>
+                  <span className="text-xs text-gray-400">{s.total_hires} 次雇用</span>
                 </div>
                 <p className="font-medium text-gray-900 text-sm mb-1">{s.name}</p>
                 <p className="text-xs text-gray-500 line-clamp-2 mb-2">{s.description}</p>
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-yellow-500">{'★'.repeat(Math.round(s.avg_rating))}{'☆'.repeat(5-Math.round(s.avg_rating))}</span>
                   <span className="text-sm font-bold text-gray-900">
-                    {s.price_usdc > 0 ? `${s.price_usdc} 华币` : 'Free'}
+                    {s.price_usdc > 0 ? `${s.price_usdc} 华币` : '免费'}
                   </span>
                 </div>
               </div>
@@ -407,8 +419,8 @@ export default function AgentDetailPage() {
       {tools.length > 0 && (
         <div className="bg-white rounded-lg shadow-sm p-8 mb-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold text-gray-900">Registered APIs</h2>
-            <Link to="/tools" className="text-xs text-indigo-500 hover:underline">View registry</Link>
+            <h2 className="text-xl font-bold text-gray-900">已注册接口</h2>
+            <Link to="/tools" className="text-xs text-indigo-500 hover:underline">查看全部</Link>
           </div>
           <div className="space-y-2">
             {tools.slice(0, 3).map(t => (
@@ -421,8 +433,8 @@ export default function AgentDetailPage() {
                   <p className="text-xs text-gray-500 truncate">{t.description}</p>
                 </div>
                 <div className="text-right ml-3 flex-shrink-0">
-                  <p className="text-xs text-gray-400">{t.total_calls} calls</p>
-                  <p className="text-xs font-medium text-gray-700">{t.price_per_call === 0 ? 'Free' : `${t.price_per_call} NAU`}</p>
+                  <p className="text-xs text-gray-400">{t.total_calls} 次调用</p>
+                  <p className="text-xs font-medium text-gray-700">{t.price_per_call === 0 ? '免费' : `${t.price_per_call} NAU`}</p>
                 </div>
               </div>
             ))}
@@ -440,12 +452,12 @@ export default function AgentDetailPage() {
               <Link key={task.id} to={`/tasks/${task.id}`} className="block border border-gray-200 rounded-lg p-4 hover:border-indigo-300 transition-colors">
                 <div className="flex justify-between">
                   <div>
-                    <span className="px-2 py-1 rounded text-xs font-medium bg-gray-100">{task.status}</span>
+                    <span className="px-2 py-1 rounded text-xs font-medium bg-gray-100">{STATUS_LABELS[task.status] ?? task.status}</span>
                     <span className="ml-2 px-2 py-1 rounded text-xs font-medium bg-gray-100">{task.task_type}</span>
                     <p className="text-sm text-gray-900 mt-2">{task.description}</p>
                   </div>
                   <div className="text-right">
-                    <p className="font-bold text-indigo-600">{task.reward} NAU</p>
+                    <p className="font-bold text-indigo-600">{Number(task.reward) / 1e18} 华币</p>
                     <p className="text-xs text-gray-400">{new Date(task.created_at).toLocaleDateString('zh-CN')}</p>
                   </div>
                 </div>

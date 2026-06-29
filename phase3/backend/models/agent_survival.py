@@ -5,7 +5,7 @@ AgentSurvival数据模型
 from sqlalchemy import Column, Integer, String, Float, BigInteger, DateTime, ForeignKey, Text
 from sqlalchemy.orm import relationship
 from datetime import datetime, timedelta
-from models.database import Base
+from models.database import Base, WeiInt
 
 
 class AgentSurvival(Base):
@@ -28,8 +28,8 @@ class AgentSurvival(Base):
     survival_level = Column(String(20), default="GROWING", nullable=False, index=True)  # 生存等级
 
     # Financial data
-    total_income = Column(BigInteger, default=0, nullable=False)  # 总收入 (wei)
-    total_cost = Column(BigInteger, default=0, nullable=False)  # 总成本 (wei)
+    total_income = Column(WeiInt, default=0, nullable=False)  # 总收入 (wei)
+    total_cost = Column(WeiInt, default=0, nullable=False)  # 总成本 (wei)
 
     # Status
     status = Column(String(20), default="ACTIVE", nullable=False, index=True)  # ACTIVE, WARNING, CRITICAL
@@ -115,7 +115,7 @@ class AgentTransaction(Base):
     category = Column(String(50), nullable=False)  # TASK_REWARD, COMPUTE_COST, STORAGE_COST, etc
 
     # Amount
-    amount = Column(BigInteger, nullable=False)  # Amount in wei
+    amount = Column(WeiInt, nullable=False)  # Amount in wei
 
     # Related
     task_id = Column(String(100), nullable=True)

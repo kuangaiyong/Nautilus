@@ -1,7 +1,7 @@
 import axios, { AxiosInstance, AxiosError } from 'axios'
 import { tokenUtils } from './token'
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://www.nautilus.social/api'
+const API_BASE_URL = (import.meta.env.VITE_API_URL || 'https://www.nautilus.social') + '/api'
 
 export const apiClient: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,

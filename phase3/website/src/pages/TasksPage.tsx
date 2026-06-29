@@ -14,6 +14,15 @@ interface Task {
   created_at: string
 }
 
+const STATUS_LABELS: Record<string, string> = {
+  OPEN: '开放中', ACCEPTED: '已接单', SUBMITTED: '已提交',
+  VERIFIED: '已验证', COMPLETED: '已完成', FAILED: '失败', DISPUTED: '申诉中',
+}
+const TYPE_LABELS: Record<string, string> = {
+  CODE: '代码', DATA: '数据', COMPUTE: '计算', RESEARCH: '研究',
+  DESIGN: '设计', WRITING: '写作', OTHER: '其他',
+}
+
 export default function TasksPage() {
   const { token } = useAuth()
   const [searchQuery, setSearchQuery] = useState('')
@@ -42,7 +51,7 @@ export default function TasksPage() {
         const data = await response.json()
         setTasks(Array.isArray(data) ? data : (data.data || []))
       } catch (error) {
-        console.error('Failed to load tasks:', error)
+        console.error('加载任务失败:', error)
       } finally {
         setLoading(false)
       }
@@ -61,14 +70,14 @@ export default function TasksPage() {
       const q = debouncedSearch.toLowerCase()
       result = result.filter(t => t.description.toLowerCase().includes(q) || t.task_type.toLowerCase().includes(q))
     }
-    result = result.filter(t => t.reward >= filters.minReward && t.reward <= filters.maxReward)
+    result = result.filter(t => t.reward / 1e18 >= filters.minReward && t.reward / 1e18 <= filters.maxReward)
     return result
   }, [tasks, debouncedSearch, filters.minReward, filters.maxReward])
 
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
-      Open: 'bg-green-500 text-white', Accepted: 'bg-blue-500 text-white', Submitted: 'bg-yellow-500 text-white',
-      Verified: 'bg-purple-500 text-white', Completed: 'bg-gray-500 text-white', Failed: 'bg-red-500 text-white',
+      OPEN: 'bg-green-500 text-white', ACCEPTED: 'bg-blue-500 text-white', SUBMITTED: 'bg-yellow-500 text-white',
+      VERIFIED: 'bg-purple-500 text-white', COMPLETED: 'bg-gray-500 text-white', FAILED: 'bg-red-500 text-white',
     }
     return colors[status] || 'bg-gray-500 text-white'
   }
@@ -78,37 +87,37 @@ export default function TasksPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative z-10">
         <div className="flex justify-between items-center mb-8">
           <div>
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">Task Marketplace</h1>
-            <p className="text-gray-600 mt-2">Discover and accept high-value tasks</p>
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">任务市场</h1>
+            <p className="text-gray-600 mt-2">发现并接取高价值任务</p>
           </div>
           <Link to="/tasks/create" className="px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl hover:shadow-lg transition-all flex items-center gap-2">
-            <Sparkles size={20} /> Create Task
+            <Sparkles size={20} /> 发布任务
           </Link>
         </div>
 
         <div className="backdrop-blur-xl bg-white/70 rounded-2xl shadow-xl border border-white/20 p-6 mb-6">
           <div className="relative mb-4">
             <Search size={24} className="absolute left-4 top-1/2 -translate-y-1/2 text-indigo-400" />
-            <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search task descriptions, types..." className="w-full pl-14 pr-14 py-4 text-lg border-2 border-indigo-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white/50" />
+            <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="搜索任务描述、类型…" className="w-full pl-14 pr-14 py-4 text-lg border-2 border-indigo-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white/50" />
             {searchQuery && <button onClick={() => { setSearchQuery(''); setDebouncedSearch('') }} className="absolute right-4 top-1/2 -translate-y-1/2"><X size={24} className="text-gray-400" /></button>}
           </div>
           <button onClick={() => setShowAdvancedFilters(!showAdvancedFilters)} className="flex items-center gap-2 text-indigo-600 font-medium">
-            <Filter size={18} /> Advanced Filters <ChevronDown size={18} className={`transition-transform ${showAdvancedFilters ? 'rotate-180' : ''}`} />
+            <Filter size={18} /> 高级筛选 <ChevronDown size={18} className={`transition-transform ${showAdvancedFilters ? 'rotate-180' : ''}`} />
           </button>
           {showAdvancedFilters && (
             <div className="grid grid-cols-2 gap-4 mt-4 pt-4 border-t border-indigo-100">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">状态</label>
                 <select value={filters.status} onChange={e => setFilters({ ...filters, status: e.target.value })} className="w-full px-4 py-2 border border-indigo-100 rounded-lg">
-                  <option value="">All Statuses</option>
-                  {['Open','Accepted','Submitted','Verified','Completed','Failed'].map(s => <option key={s} value={s}>{s}</option>)}
+                  <option value="">全部状态</option>
+                  {['OPEN','ACCEPTED','SUBMITTED','VERIFIED','COMPLETED','FAILED'].map(s => <option key={s} value={s}>{STATUS_LABELS[s] || s}</option>)}
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Task Type</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">任务类型</label>
                 <select value={filters.task_type} onChange={e => setFilters({ ...filters, task_type: e.target.value })} className="w-full px-4 py-2 border border-indigo-100 rounded-lg">
-                  <option value="">All Types</option>
-                  {['CODE','DATA','COMPUTE','RESEARCH','DESIGN','WRITING','OTHER'].map(t => <option key={t} value={t}>{t}</option>)}
+                  <option value="">全部类型</option>
+                  {['CODE','DATA','COMPUTE','RESEARCH','DESIGN','WRITING','OTHER'].map(t => <option key={t} value={t}>{TYPE_LABELS[t] || t}</option>)}
                 </select>
               </div>
             </div>
@@ -130,26 +139,26 @@ export default function TasksPage() {
             <div className="w-24 h-24 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
               <Search size={40} className="text-gray-400" />
             </div>
-            <p className="text-gray-600 mt-4">{debouncedSearch ? 'No matching tasks found' : 'No tasks available'}</p>
+            <p className="text-gray-600 mt-4">{debouncedSearch ? '未找到匹配的任务' : '暂无任务'}</p>
           </div>
         ) : (
           <>
-            {debouncedSearch && <div className="mb-4 text-sm text-gray-600">Found <span className="font-semibold text-indigo-600">{filteredTasks.length}</span> matching tasks</div>}
+            {debouncedSearch && <div className="mb-4 text-sm text-gray-600">找到 <span className="font-semibold text-indigo-600">{filteredTasks.length}</span> 个匹配任务</div>}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {filteredTasks.map(task => (
                 <Link key={task.id} to={`/tasks/${task.id}`} className="group bg-white/70 rounded-2xl shadow-xl border-2 border-transparent hover:border-indigo-300 p-6 hover:shadow-2xl transition-all block">
                   <div className="flex items-center gap-2 mb-3">
-                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${getStatusColor(task.status)}`}>{task.status}</span>
-                    <span className="px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">{task.task_type}</span>
+                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${getStatusColor(task.status)}`}>{STATUS_LABELS[task.status] || task.status}</span>
+                    <span className="px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">{TYPE_LABELS[task.task_type] || task.task_type}</span>
                   </div>
                   <p className="text-gray-900 font-medium line-clamp-3 mb-4">{task.description}</p>
                   <div className="flex justify-between items-end pt-4 border-t border-gray-200">
                     <div>
-                      <p className="text-xs text-gray-500">Reward</p>
-                      <p className="text-2xl font-bold text-indigo-600">{task.reward} <span className="text-xs text-gray-500">NAU</span></p>
+                      <p className="text-xs text-gray-500">奖励</p>
+                      <p className="text-2xl font-bold text-indigo-600">{Number(task.reward) / 1e18} <span className="text-xs text-gray-500">华币</span></p>
                     </div>
                     <div className="text-right text-xs text-gray-400">
-                      <p>Task #{task.id}</p>
+                      <p>任务 #{task.id}</p>
                       <p>{new Date(task.created_at).toLocaleDateString()}</p>
                     </div>
                   </div>
@@ -161,9 +170,9 @@ export default function TasksPage() {
 
         {!loading && filteredTasks.length > 0 && (
           <div className="mt-8 flex justify-center gap-2">
-            <button onClick={() => setPage(Math.max(0, page - 1))} disabled={page === 0} className="px-6 py-3 bg-white border border-indigo-100 rounded-xl disabled:opacity-50 font-medium">Previous</button>
-            <span className="px-6 py-3 bg-white border border-indigo-200 rounded-xl font-medium">Page {page + 1}</span>
-            <button onClick={() => setPage(page + 1)} disabled={tasks.length < limit} className="px-6 py-3 bg-white border border-indigo-100 rounded-xl disabled:opacity-50 font-medium">Next</button>
+            <button onClick={() => setPage(Math.max(0, page - 1))} disabled={page === 0} className="px-6 py-3 bg-white border border-indigo-100 rounded-xl disabled:opacity-50 font-medium">上一页</button>
+            <span className="px-6 py-3 bg-white border border-indigo-200 rounded-xl font-medium">第 {page + 1} 页</span>
+            <button onClick={() => setPage(page + 1)} disabled={tasks.length < limit} className="px-6 py-3 bg-white border border-indigo-100 rounded-xl disabled:opacity-50 font-medium">下一页</button>
           </div>
         )}
       </div>

@@ -4,6 +4,7 @@ Code Executor - Generates and executes code tasks using LLM + Docker sandbox.
 import docker
 import tempfile
 import os
+import sys
 import json
 import subprocess
 from typing import Dict, Any
@@ -41,7 +42,14 @@ class CodeExecutor:
         else:
             code = await self._generate_code(state)
 
-        return await self._run_code(code)
+        # 交付物以生成的代码为主（"实现"类任务的产出就是代码），附运行输出；
+        # 运行失败不影响交付（代码仍返回），便于发布者评审。
+        try:
+            output = await self._run_code(code)
+        except Exception as e:
+            output = f"(执行失败: {e})"
+
+        return f"```python\n{code}\n```\n\n--- 运行输出 ---\n{output}".strip()
 
     async def _generate_code(self, state) -> str:
         """Generate Python code using LLM."""
@@ -134,7 +142,7 @@ Respond with ONLY Python code in ```python ... ``` markers."""
 
         try:
             result = subprocess.run(
-                ["python", temp_path],
+                [sys.executable, temp_path],  # 用当前(venv)解释器，避免依赖 PATH 上的 python
                 capture_output=True, text=True, timeout=30,
             )
             if result.returncode != 0:

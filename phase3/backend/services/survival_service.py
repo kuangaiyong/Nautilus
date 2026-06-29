@@ -311,7 +311,14 @@ class SurvivalService:
         description: Optional[str] = None
     ) -> AgentTransaction:
         """记录收入"""
+        # 先取得归属的生存记录（缺失则补建）：AgentTransaction.agent_survival_id
+        # 为 NOT NULL 外键，必须在建交易前确定，否则插入会违反约束。
+        survival = db.query(AgentSurvival).filter(AgentSurvival.agent_id == agent_id).first()
+        if survival is None:
+            survival = SurvivalService.create_agent_survival(db, agent_id)
+
         transaction = AgentTransaction(
+            agent_survival_id=survival.id,
             agent_id=agent_id,
             type="INCOME",
             category=category,
@@ -322,7 +329,6 @@ class SurvivalService:
         db.add(transaction)
 
         # 更新总收入
-        survival = db.query(AgentSurvival).filter(AgentSurvival.agent_id == agent_id).first()
         if survival:
             survival.total_income += amount
             survival.roi = SurvivalService.calculate_roi(survival.total_income, survival.total_cost)
@@ -345,7 +351,13 @@ class SurvivalService:
         description: Optional[str] = None
     ) -> AgentTransaction:
         """记录成本"""
+        # 同 record_income：agent_survival_id 为 NOT NULL 外键，须先确定生存记录。
+        survival = db.query(AgentSurvival).filter(AgentSurvival.agent_id == agent_id).first()
+        if survival is None:
+            survival = SurvivalService.create_agent_survival(db, agent_id)
+
         transaction = AgentTransaction(
+            agent_survival_id=survival.id,
             agent_id=agent_id,
             type="COST",
             category=category,
@@ -356,7 +368,6 @@ class SurvivalService:
         db.add(transaction)
 
         # 更新总成本
-        survival = db.query(AgentSurvival).filter(AgentSurvival.agent_id == agent_id).first()
         if survival:
             survival.total_cost += amount
             survival.roi = SurvivalService.calculate_roi(survival.total_income, survival.total_cost)

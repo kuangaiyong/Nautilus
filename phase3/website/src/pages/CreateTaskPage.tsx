@@ -24,9 +24,9 @@ export default function CreateTaskPage() {
     setError('')
     setLoading(true)
     try {
-      if (!formData.description.trim()) throw new Error('Please enter a task description')
-      if (!formData.requirements.trim()) throw new Error('Please enter task requirements')
-      if (!formData.reward || parseFloat(formData.reward) <= 0) throw new Error('Please enter a valid reward amount')
+      if (!formData.description.trim()) throw new Error('请输入任务描述')
+      if (!formData.requirements.trim()) throw new Error('请输入任务要求')
+      if (!formData.reward || parseFloat(formData.reward) <= 0) throw new Error('请输入有效的奖励金额')
 
       const rewardInWei = Math.floor(parseFloat(formData.reward) * 1e18).toString()
       const res = await fetch('/api/tasks', {
@@ -46,13 +46,13 @@ export default function CreateTaskPage() {
       })
       if (!res.ok) {
         const d = await res.json()
-        throw new Error(d.detail || 'Failed')
+        throw new Error(d.detail || '提交失败')
       }
       const data = await res.json()
       setSuccess(true)
       setTimeout(() => navigate(`/tasks/${data.data?.id || data.id}`), 2000)
     } catch (err: any) {
-      setError(err.message || 'Failed to create task')
+      setError(err.message || '创建任务失败')
     } finally {
       setLoading(false)
     }
@@ -67,10 +67,10 @@ export default function CreateTaskPage() {
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-lg shadow-lg p-8 max-w-md w-full text-center">
           <AlertCircle className="w-16 h-16 text-yellow-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold mb-2">Login Required</h2>
-          <p className="text-gray-600 mb-6">Please login to create tasks</p>
+          <h2 className="text-2xl font-bold mb-2">需要登录</h2>
+          <p className="text-gray-600 mb-6">请先登录后再发布任务</p>
           <button onClick={() => navigate('/login')} className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">
-            Go to Login
+            前往登录
           </button>
         </div>
       </div>
@@ -82,8 +82,8 @@ export default function CreateTaskPage() {
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-lg shadow-lg p-8 max-w-md w-full text-center">
           <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold mb-2">Task Created!</h2>
-          <p className="text-gray-600">Redirecting to task details...</p>
+          <h2 className="text-2xl font-bold mb-2">任务已发布！</h2>
+          <p className="text-gray-600">正在跳转到任务详情…</p>
         </div>
       </div>
     )
@@ -94,10 +94,10 @@ export default function CreateTaskPage() {
       <div className="max-w-3xl mx-auto">
         <div className="mb-8">
           <button onClick={() => navigate('/tasks')} className="flex items-center text-gray-600 hover:text-gray-900 mb-4">
-            <ArrowLeft className="w-5 h-5 mr-2" />Back to Tasks
+            <ArrowLeft className="w-5 h-5 mr-2" />返回任务列表
           </button>
-          <h1 className="text-3xl font-bold">Create New Task</h1>
-          <p className="text-gray-600 mt-2">Publish a task to the Nautilus network for AI Agents to complete</p>
+          <h1 className="text-3xl font-bold">发布新任务</h1>
+          <p className="text-gray-600 mt-2">向 Nautilus 网络发布任务，由 AI 智能体完成</p>
         </div>
 
         <div className="bg-white rounded-lg shadow-lg p-8">
@@ -106,49 +106,49 @@ export default function CreateTaskPage() {
               <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start">
                 <AlertCircle className="w-5 h-5 text-red-500 mr-3 mt-0.5" />
                 <div>
-                  <h3 className="text-sm font-medium text-red-800">Creation Failed</h3>
+                  <h3 className="text-sm font-medium text-red-800">发布失败</h3>
                   <p className="text-sm text-red-700 mt-1">{error}</p>
                 </div>
               </div>
             )}
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Task Type *</label>
-              <select name="task_type" value={formData.task_type} onChange={handleChange} className="w-full px-4 py-2 border rounded-lg" required>
-                <option value="CODE">Code Execution (CODE)</option>
-                <option value="DATA">Data Processing (DATA)</option>
-                <option value="COMPUTE">Compute Task (COMPUTE)</option>
+              <label className="block text-sm font-medium text-gray-700 mb-2">任务类型 *</label>
+              <select name="task_type" value={formData.task_type} onChange={handleChange} className="w-full px-4 py-2 border rounded-lg text-gray-900 bg-white" required>
+                <option value="CODE">代码执行（CODE）</option>
+                <option value="DATA">数据处理（DATA）</option>
+                <option value="COMPUTE">计算任务（COMPUTE）</option>
               </select>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Description *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">任务描述 *</label>
               <textarea
                 name="description"
                 value={formData.description}
                 onChange={handleChange}
                 rows={3}
-                className="w-full px-4 py-2 border rounded-lg"
-                placeholder="Briefly describe your task..."
+                className="w-full px-4 py-2 border rounded-lg text-gray-900"
+                placeholder="简要描述你的任务…"
                 required
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Detailed Requirements *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">详细要求 *</label>
               <textarea
                 name="requirements"
                 value={formData.requirements}
                 onChange={handleChange}
                 rows={8}
-                className="w-full px-4 py-2 border rounded-lg font-mono text-sm"
-                placeholder="Describe the input, processing steps, and expected output in detail"
+                className="w-full px-4 py-2 border rounded-lg font-mono text-sm text-gray-900"
+                placeholder="详细描述输入、处理步骤与期望输出"
                 required
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Reward (ETH) *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">奖励（华币）*</label>
               <input
                 type="number"
                 name="reward"
@@ -156,36 +156,36 @@ export default function CreateTaskPage() {
                 onChange={handleChange}
                 step="0.001"
                 min="0.001"
-                className="w-full px-4 py-2 border rounded-lg"
-                placeholder="0.1"
+                className="w-full px-4 py-2 border rounded-lg text-gray-900"
+                placeholder="100"
                 required
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Timeout</label>
-              <select name="timeout" value={formData.timeout} onChange={handleChange} className="w-full px-4 py-2 border rounded-lg">
-                <option value="300">5 minutes</option>
-                <option value="600">10 minutes</option>
-                <option value="1800">30 minutes</option>
-                <option value="3600">1 hour</option>
-                <option value="7200">2 hours</option>
+              <label className="block text-sm font-medium text-gray-700 mb-2">超时时间</label>
+              <select name="timeout" value={formData.timeout} onChange={handleChange} className="w-full px-4 py-2 border rounded-lg text-gray-900 bg-white">
+                <option value="300">5 分钟</option>
+                <option value="600">10 分钟</option>
+                <option value="1800">30 分钟</option>
+                <option value="3600">1 小时</option>
+                <option value="7200">2 小时</option>
               </select>
             </div>
 
             <div className="flex gap-4 pt-4">
               <button type="button" onClick={() => navigate('/tasks')} className="flex-1 px-6 py-3 border text-gray-700 rounded-lg" disabled={loading}>
-                Cancel
+                取消
               </button>
               <button type="submit" disabled={loading} className="flex-1 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 disabled:bg-gray-400 flex items-center justify-center">
                 {loading ? (
                   <>
                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                    Creating...
+                    发布中…
                   </>
                 ) : (
                   <>
-                    <Plus className="w-5 h-5 mr-2" />Create Task
+                    <Plus className="w-5 h-5 mr-2" />发布任务
                   </>
                 )}
               </button>

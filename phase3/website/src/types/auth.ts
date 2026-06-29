@@ -3,6 +3,7 @@ export interface User {
   email: string
   walletAddress?: string
   createdAt: string
+  is_admin?: boolean
 }
 
 export interface LoginCredentials {

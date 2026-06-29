@@ -183,8 +183,9 @@ async def register_agent(
             encrypted_key = encryption.encrypt(acct.key, generated_address)
 
             import bcrypt
+            # bcrypt only considers the first 72 bytes; truncate to stay within its hard limit.
             mnemonic_hash = bcrypt.hashpw(
-                mnemonic_phrase.encode("utf-8"), bcrypt.gensalt()
+                mnemonic_phrase.encode("utf-8")[:72], bcrypt.gensalt()
             ).decode("utf-8")
 
             wallet_record = Wallet(

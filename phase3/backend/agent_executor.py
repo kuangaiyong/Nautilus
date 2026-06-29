@@ -7,7 +7,7 @@ enabling automatic task execution by agents.
 import asyncio
 import logging
 from typing import Dict, Any, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 
 from models.database import Task, Agent, TaskStatus
@@ -93,10 +93,11 @@ async def execute_task_by_agent(
     # Prepare task data for agent engine
     task_data = {
         "task_id": task.id,
-        "task_type": task.task_type or "CODE",  # Default to CODE
+        # TaskType 是 enum.Enum，引擎按字符串比较（== "CODE"），需取 .value
+        "task_type": (task.task_type.value if hasattr(task.task_type, "value") else (task.task_type or "CODE")),
         "description": task.description,
-        "input_data": task.requirements,  # Use requirements as input
-        "expected_output": None  # No expected output for real tasks
+        "input_data": task.input_data,  # 任务输入/要求（模型字段是 input_data，不是 requirements）
+        "expected_output": task.expected_output,
     }
 
     try:
@@ -121,6 +122,9 @@ async def execute_task_by_agent(
 
         # Run through execution graph
         result_state = await engine.graph.ainvoke(state)
+        # LangGraph 的 ainvoke 返回 dict（各 channel 的值），转回 AgentState 以便属性访问
+        if isinstance(result_state, dict):
+            result_state = AgentState(**result_state)
 
         end_time = datetime.now(timezone.utc)
         execution_time = (end_time - start_time).total_seconds()
@@ -231,28 +235,41 @@ async def execute_task_by_agent(
         raise RuntimeError(f"Task execution failed: {str(e)}")
 
 
+async def _run_task_in_background(task_id: int, agent_id: int) -> None:
+    """Execute a task with its OWN DB session.
+
+    The caller's session (FastAPI request / auto-assign scheduler) is closed once
+    the caller returns, so a fire-and-forget execution must not reuse it — it would
+    hit a closed/detached session. Open a fresh session scoped to this background task.
+    """
+    from utils.database import SessionLocal
+    db = SessionLocal()
+    try:
+        await execute_task_by_agent(task_id, agent_id, db)
+    except Exception as e:
+        logger.error(f"Background execution of task {task_id} failed: {e}", exc_info=True)
+    finally:
+        db.close()
+
+
 async def submit_task_to_queue(
     task_id: int,
     agent_id: int,
-    db: Session
+    db: Session = None
 ) -> str:
     """
-    Submit task to execution queue.
+    Submit task to execution queue (async background execution).
 
-    This creates a background task that will execute the task asynchronously.
-
-    Args:
-        task_id: Task ID
-        agent_id: Agent ID
-        db: Database session
+    The `db` arg is accepted for backward compatibility but intentionally NOT reused
+    by the background task — it would be closed by the time the task runs. The
+    background task opens its own session instead.
 
     Returns:
         Task queue ID
     """
     logger.info(f"Submitting task {task_id} to execution queue for agent {agent_id}")
 
-    # Create background task
-    asyncio.create_task(execute_task_by_agent(task_id, agent_id, db))
+    asyncio.create_task(_run_task_in_background(task_id, agent_id))
 
     return f"task_{task_id}_agent_{agent_id}"
 

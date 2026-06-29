@@ -26,7 +26,7 @@ export default function Header() {
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-8">
-            <Link to="/marketplace" className="hover:text-primary-400 transition">
+            <Link to="/tasks" className="hover:text-primary-400 transition">
               任务市场
             </Link>
             <Link to="/agents" className="hover:text-primary-400 transition">
@@ -74,6 +74,37 @@ export default function Header() {
 
                 {isUserMenuOpen && (
                   <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg py-2">
+                    <Link
+                      to="/create-wallet"
+                      className="block px-4 py-2 text-gray-800 hover:bg-gray-100"
+                      onClick={() => setIsUserMenuOpen(false)}
+                    >
+                      我的钱包
+                    </Link>
+                    <Link
+                      to="/tasks/create"
+                      className="block px-4 py-2 text-gray-800 hover:bg-gray-100"
+                      onClick={() => setIsUserMenuOpen(false)}
+                    >
+                      发布任务
+                    </Link>
+                    <Link
+                      to="/agent/register"
+                      className="block px-4 py-2 text-gray-800 hover:bg-gray-100"
+                      onClick={() => setIsUserMenuOpen(false)}
+                    >
+                      发布智能体
+                    </Link>
+                    {user?.is_admin && (
+                      <Link
+                        to="/admin/mint"
+                        className="block px-4 py-2 text-gray-800 hover:bg-gray-100"
+                        onClick={() => setIsUserMenuOpen(false)}
+                      >
+                        管理员发币
+                      </Link>
+                    )}
+                    <div className="my-1 border-t border-gray-100" />
                     <Link
                       to="/dashboard"
                       className="block px-4 py-2 text-gray-800 hover:bg-gray-100"
@@ -141,7 +172,7 @@ export default function Header() {
         {isMenuOpen && (
           <div className="md:hidden mt-4 pb-4 space-y-4">
             <Link
-              to="/marketplace"
+              to="/tasks"
               className="block hover:text-primary-400 transition"
             >
               任务市场
@@ -179,6 +210,32 @@ export default function Header() {
 
             {isAuthenticated ? (
               <>
+                <Link
+                  to="/create-wallet"
+                  className="block hover:text-primary-400 transition"
+                >
+                  我的钱包
+                </Link>
+                <Link
+                  to="/tasks/create"
+                  className="block hover:text-primary-400 transition"
+                >
+                  发布任务
+                </Link>
+                <Link
+                  to="/agent/register"
+                  className="block hover:text-primary-400 transition"
+                >
+                  发布智能体
+                </Link>
+                {user?.is_admin && (
+                  <Link
+                    to="/admin/mint"
+                    className="block hover:text-primary-400 transition"
+                  >
+                    管理员发币
+                  </Link>
+                )}
                 <Link
                   to="/dashboard"
                   className="block hover:text-primary-400 transition"

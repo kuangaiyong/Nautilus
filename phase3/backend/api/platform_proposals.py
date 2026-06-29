@@ -64,7 +64,7 @@ def create_proposal(body: dict, db=Depends(get_db)):
             """INSERT INTO platform_improvement_proposals
                (id, task_id, root_cause, agent_id, proposed_change, expected_impact,
                 rollback_plan, vote_score, vote_count, status)
-               VALUES (:id, :task_id, :root_cause, :agent_id, CAST(:proposed_change AS jsonb),
+               VALUES (:id, :task_id, :root_cause, :agent_id, :proposed_change,
                        :expected_impact, :rollback_plan, 0.0, 0, 'pending')""",
             {
                 "id": proposal_id,
