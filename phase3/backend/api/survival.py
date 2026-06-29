@@ -134,19 +134,21 @@ async def get_leaderboard(
     level: Optional[str] = Query(None, description="筛选等级: ELITE, MATURE, GROWING, etc"),
     limit: int = Query(10, ge=1, le=100, description="返回数量"),
     offset: int = Query(0, ge=0, description="偏移量"),
+    sort: str = Query("score", description="排序维度: roi / tasks / score(默认)"),
     db: Session = Depends(get_db)
 ):
     """
     获取排行榜
 
-    可以按等级筛选，按总积分排序
+    可以按等级筛选；排序维度由 sort 指定（roi / tasks / score）。
     """
     try:
         survivals = SurvivalService.get_leaderboard(
             db=db,
             level=level,
             limit=limit,
-            offset=offset
+            offset=offset,
+            sort=sort
         )
 
         return SurvivalResponse(

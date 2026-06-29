@@ -7,9 +7,11 @@ interface Agent {
   description?: string
   specialties?: string[] | string
   reputation: number
-  tasks_completed: number
-  tasks_failed: number
-  total_earned: number
+  reputation_score: number
+  completed_tasks: number
+  failed_tasks: number
+  total_earnings: number
+  total_income: string   // wei，来自 survival 的真实结算收入
   created_at: string
 }
 
@@ -68,7 +70,6 @@ interface Tool {
   http_method: string
 }
 
-const BASESCAN_TX_URL = 'https://basescan.org/tx/'
 const NAU_HISTORY_DISPLAY_LIMIT = 10
 
 const TASK_TYPE_LABELS: Record<string, string> = {
@@ -150,8 +151,23 @@ export default function AgentDetailPage() {
     if (!id) return
     fetch(`/api/agents/${id}/capability-profile`)
       .then(r => r.ok ? r.json() : null)
-      .then((data: CapabilityProfile | null) => {
-        if (data) setCapabilityProfile(data)
+      .then((res: any) => {
+        // 后端返回信封 {success, data:{capability_stats, suggested_focus(str|null)}}，
+        // 字段名/结构与前端 CapabilityProfile 不同，这里做适配。
+        const p = res?.data ?? res
+        if (!p) return
+        const stats = p.capability_stats || []
+        setCapabilityProfile({
+          capabilities: stats.map((c: any) => ({
+            task_type: c.task_type,
+            success_count: c.success_count,
+            total_count: c.total_attempts,
+            success_rate: c.success_rate,
+            level: c.level,
+          })),
+          suggested_focus: p.suggested_focus ? [p.suggested_focus] : [],
+          total_tasks: stats.reduce((s: number, c: any) => s + (c.total_attempts || 0), 0),
+        })
       })
       .catch(() => {})
   }, [id])
@@ -170,16 +186,17 @@ export default function AgentDetailPage() {
 
   const getSuccessRate = () => {
     if (!agent) return 0
-    const total = agent.tasks_completed + agent.tasks_failed
-    return total === 0 ? 0 : Math.round((agent.tasks_completed / total) * 100)
+    const total = (agent.completed_tasks || 0) + (agent.failed_tasks || 0)
+    return total === 0 ? 0 : Math.round(((agent.completed_tasks || 0) / total) * 100)
   }
 
+  // reputation_score 为 0-100 的 EWMA 分（对齐后端 ReputationTier 分档）
   const getReputationLevel = () => {
     if (!agent) return '新手'
-    if (agent.reputation >= 200) return '大师'
-    if (agent.reputation >= 150) return '专家'
-    if (agent.reputation >= 100) return '高级'
-    if (agent.reputation >= 50) return '中级'
+    const r = agent.reputation_score ?? 0
+    if (r >= 80) return '专家'
+    if (r >= 60) return '资深'
+    if (r >= 40) return '中级'
     return '新手'
   }
 
@@ -212,7 +229,7 @@ export default function AgentDetailPage() {
             <p className="text-gray-500">智能体 #{agent.id}</p>
           </div>
           <div className="text-right">
-            <p className="text-3xl font-bold text-indigo-600">{agent.reputation}</p>
+            <p className="text-3xl font-bold text-indigo-600">{(agent.reputation_score ?? 0).toFixed(1)}</p>
             <p className="text-sm text-gray-500">{getReputationLevel()}</p>
           </div>
         </div>
@@ -238,16 +255,16 @@ export default function AgentDetailPage() {
             <p className="text-sm text-gray-500">成功率</p>
           </div>
           <div className="bg-gray-50 p-4 rounded-lg text-center">
-            <p className="text-2xl font-bold text-gray-900">{agent.tasks_completed}</p>
+            <p className="text-2xl font-bold text-gray-900">{agent.completed_tasks ?? 0}</p>
             <p className="text-sm text-gray-500">完成任务</p>
           </div>
           <div className="bg-gray-50 p-4 rounded-lg text-center">
-            <p className="text-2xl font-bold text-gray-900">{agent.tasks_failed}</p>
+            <p className="text-2xl font-bold text-gray-900">{agent.failed_tasks ?? 0}</p>
             <p className="text-sm text-gray-500">失败任务</p>
           </div>
           <div className="bg-gray-50 p-4 rounded-lg text-center">
-            <p className="text-2xl font-bold text-indigo-600">{agent.total_earned}</p>
-            <p className="text-sm text-gray-500">总收益</p>
+            <p className="text-2xl font-bold text-indigo-600">{(Number(agent.total_income || 0) / 1e18).toFixed(2)}</p>
+            <p className="text-sm text-gray-500">总收益 (华币)</p>
           </div>
           <div className="bg-purple-50 p-4 rounded-lg text-center">
             {nauBalance !== null ? (
@@ -289,15 +306,12 @@ export default function AgentDetailPage() {
                       </span>
                     )}
                   </div>
-                  <a
-                    href={`${BASESCAN_TX_URL}${item.blockchain_tx_hash}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-indigo-500 hover:text-indigo-700 font-mono truncate max-w-[140px]"
+                  <span
+                    className="text-xs text-gray-500 font-mono truncate max-w-[140px]"
                     title={item.blockchain_tx_hash}
                   >
                     {item.blockchain_tx_hash.slice(0, 8)}...{item.blockchain_tx_hash.slice(-6)}
-                  </a>
+                  </span>
                 </div>
               ))}
             </div>

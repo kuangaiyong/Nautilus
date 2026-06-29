@@ -15,6 +15,10 @@ logger = logging.getLogger(__name__)
 
 def _agent_to_dict(agent: Agent) -> dict:
     """Serialize an Agent ORM row to a plain dict (AgentResponse-compatible)."""
+    # survival 为一对一关系（uselist=False, lazy="joined"，无额外查询）。真实结算收入
+    # 存于 survival.total_income（WeiInt，可容纳大额）；agents.total_earnings 是遗留的
+    # BigInteger，>~9.22 华币会溢出，故"收益"展示改用 survival 的 wei，前端再 /1e18。
+    sv = getattr(agent, "survival", None)
     return {
         "id": agent.id,
         "agent_id": agent.agent_id,
@@ -22,11 +26,13 @@ def _agent_to_dict(agent: Agent) -> dict:
         "name": agent.name,
         "description": agent.description,
         "reputation": agent.reputation,
+        "reputation_score": float(agent.reputation_score) if agent.reputation_score is not None else 0.0,
         "specialties": agent.specialties,
         "current_tasks": agent.current_tasks,
         "completed_tasks": agent.completed_tasks,
         "failed_tasks": agent.failed_tasks,
         "total_earnings": agent.total_earnings,
+        "total_income": str(sv.total_income) if sv and sv.total_income is not None else "0",
         "created_at": agent.created_at,
         "blockchain_registered": agent.blockchain_registered,
         "blockchain_tx_hash": agent.blockchain_tx_hash,

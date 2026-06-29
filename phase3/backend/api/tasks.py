@@ -739,11 +739,17 @@ async def complete_task(
     # finished task no longer counts against the agent's availability during matching.
     try:
         _slot_agent = db.query(Agent).filter(Agent.owner == task.agent).first()
-        if _slot_agent and _slot_agent.current_tasks > 0:
-            _slot_agent.current_tasks -= 1
+        if _slot_agent:
+            # Release the capacity slot reserved on accept.
+            if _slot_agent.current_tasks and _slot_agent.current_tasks > 0:
+                _slot_agent.current_tasks -= 1
+            # Maintain the agent-level completion counter. The regular DMAS flow
+            # previously updated only survival.tasks_completed, leaving
+            # agents.completed_tasks stale (detail/market pages read the latter).
+            _slot_agent.completed_tasks = (_slot_agent.completed_tasks or 0) + 1
             db.commit()
     except Exception as e:
-        logger.warning(f"Failed to release agent slot for task {task_id}: {e}")
+        logger.warning(f"Failed to update agent counters for task {task_id}: {e}")
         db.rollback()
 
     # Survival system: record income, cost, and auto-calculate scores
@@ -788,6 +794,24 @@ async def complete_task(
         # serialized into the response — a poisoned session would otherwise turn
         # a settled reward into a misleading 500.
         db.rollback()
+
+    # Capability evolution: record the per-task-type outcome so the agent's
+    # capability profile actually accrues. The regular DMAS completion flow never
+    # emitted a task.completed event nor called record_task_outcome (only academic
+    # tasks did), so agent_capability_stats stayed empty regardless of the panel.
+    # Direct call (mirrors academic_tasks) keeps it synchronous and reliable.
+    try:
+        _cap_agent = db.query(Agent).filter(Agent.owner == task.agent).first()
+        if _cap_agent:
+            from services.capability_evolution import record_task_outcome
+            _tt = task.task_type.value if hasattr(task.task_type, "value") else str(task.task_type)
+            await record_task_outcome(db, _cap_agent.agent_id, _tt, success=True, quality_score=None)
+    except Exception as e:
+        logger.warning(f"Capability record failed for task {task_id}: {e}")
+        try:
+            db.rollback()
+        except Exception:
+            pass
 
     # Store task memory and reflection
     try:

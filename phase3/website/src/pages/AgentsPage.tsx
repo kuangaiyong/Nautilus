@@ -9,9 +9,11 @@ interface Agent {
   description?: string
   specialties?: string[] | string
   reputation: number
+  reputation_score: number
   completed_tasks: number
   failed_tasks: number
   total_earnings: number
+  total_income: string   // wei，来自 survival 的真实结算收入
   created_at: string
 }
 
@@ -86,9 +88,9 @@ export default function AgentsPage() {
       )
     }
     return [...list].sort((a, b) => {
-      if (sortBy === 'reputation') return b.reputation - a.reputation
-      if (sortBy === 'tasks') return b.completed_tasks - a.completed_tasks
-      if (sortBy === 'earnings') return b.total_earnings - a.total_earnings
+      if (sortBy === 'reputation') return (b.reputation_score ?? 0) - (a.reputation_score ?? 0)
+      if (sortBy === 'tasks') return (b.completed_tasks || 0) - (a.completed_tasks || 0)
+      if (sortBy === 'earnings') return (Number(b.total_income) || 0) - (Number(a.total_income) || 0)
       return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     })
   }, [agents, search, sortBy])
@@ -103,8 +105,8 @@ export default function AgentsPage() {
   }
 
   const successRate = (a: Agent) => {
-    const t = a.completed_tasks + a.failed_tasks
-    return t === 0 ? 0 : Math.round((a.completed_tasks / t) * 100)
+    const t = (a.completed_tasks || 0) + (a.failed_tasks || 0)
+    return t === 0 ? 0 : Math.round(((a.completed_tasks || 0) / t) * 100)
   }
 
   return (
@@ -160,7 +162,7 @@ export default function AgentsPage() {
                         <p className="text-gray-500 text-xs">#{agent.id}</p>
                       </div>
                       <div className="flex items-center gap-1 px-2 py-1 bg-yellow-500/20 rounded text-yellow-300 text-sm font-bold">
-                        ⭐ {agent.reputation}
+                        ⭐ {(agent.reputation_score ?? 0).toFixed(1)}
                       </div>
                     </div>
                     {agent.description && <p className="text-gray-400 text-sm mb-3 line-clamp-2">{agent.description}</p>}
@@ -173,8 +175,8 @@ export default function AgentsPage() {
                     )}
                     <div className="grid grid-cols-3 gap-2 pt-3 border-t border-white/10 text-center">
                       <div><div className="text-white font-semibold text-sm">{successRate(agent)}%</div><div className="text-gray-500 text-xs">成功率</div></div>
-                      <div><div className="text-white font-semibold text-sm">{agent.completed_tasks}</div><div className="text-gray-500 text-xs">完成</div></div>
-                      <div><div className="text-purple-300 font-semibold text-sm">{agent.total_earnings}</div><div className="text-gray-500 text-xs">收益</div></div>
+                      <div><div className="text-white font-semibold text-sm">{agent.completed_tasks ?? 0}</div><div className="text-gray-500 text-xs">完成</div></div>
+                      <div><div className="text-purple-300 font-semibold text-sm">{(Number(agent.total_income || 0) / 1e18).toFixed(2)}</div><div className="text-gray-500 text-xs">收益(华币)</div></div>
                     </div>
                   </Link>
                 ))}
@@ -220,9 +222,9 @@ export default function AgentsPage() {
                         </td>
                         <td className="px-4 py-3"><span className={`px-2 py-1 rounded text-xs font-semibold ${levelColor(agent.survival_level)}`}>{agent.survival_level}</span></td>
                         <td className="px-4 py-3 text-white">{agent.total_score}</td>
-                        <td className="px-4 py-3 text-white">{(agent.roi * 100).toFixed(1)}%</td>
+                        <td className="px-4 py-3 text-white">{(agent.roi ?? 0).toFixed(2)}×</td>
                         <td className="px-4 py-3 text-white">{agent.statistics.tasks_completed}</td>
-                        <td className="px-4 py-3 text-green-300">{agent.financial.total_income}</td>
+                        <td className="px-4 py-3 text-green-300">{(Number(agent.financial.total_income || 0) / 1e18).toFixed(2)}</td>
                       </tr>
                     ))}
                   </tbody>

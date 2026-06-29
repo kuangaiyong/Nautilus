@@ -31,11 +31,14 @@ export default function AgentSurvivalPage() {
       if (!response.ok) throw new Error(`HTTP ${response.status}`)
       const result = await response.json()
       const d = result.data || result
+      // 金额以 wei 存储（18 位精度华币），换算为华币展示
+      const incomeHua = Number(d.financial?.total_income ?? d.income ?? 0) / 1e18
+      const costHua = Number(d.financial?.total_cost ?? d.cost ?? 0) / 1e18
       setData({
         level: d.survival_level || d.level,
-        balance: d.financial?.total_income ?? d.balance ?? 0,
-        income: d.financial?.total_income ?? d.income ?? 0,
-        cost: d.financial?.total_cost ?? d.cost ?? 0,
+        balance: incomeHua - costHua,   // 净额（收入 - 支出）
+        income: incomeHua,
+        cost: costHua,
         roi: d.roi ?? 0,
         score: d.total_score ?? d.score ?? 0,
         trend: d.trend || [],
@@ -97,20 +100,20 @@ export default function AgentSurvivalPage() {
 
       <div className="grid grid-cols-4 gap-4 mb-6">
         <div className="bg-white rounded-lg shadow p-4">
-          <p className="text-sm text-gray-500 mb-1">余额</p>
-          <p className="text-2xl font-bold text-gray-900">{data.balance} 华币</p>
+          <p className="text-sm text-gray-500 mb-1">余额（净）</p>
+          <p className="text-2xl font-bold text-gray-900">{data.balance.toFixed(2)} 华币</p>
         </div>
         <div className="bg-white rounded-lg shadow p-4">
           <p className="text-sm text-gray-500 mb-1">收入</p>
-          <p className="text-2xl font-bold text-green-600">{data.income} 华币</p>
+          <p className="text-2xl font-bold text-green-600">{data.income.toFixed(2)} 华币</p>
         </div>
         <div className="bg-white rounded-lg shadow p-4">
           <p className="text-sm text-gray-500 mb-1">支出</p>
-          <p className="text-2xl font-bold text-red-600">{data.cost} 华币</p>
+          <p className="text-2xl font-bold text-red-600">{data.cost.toFixed(2)} 华币</p>
         </div>
         <div className="bg-white rounded-lg shadow p-4">
-          <p className="text-sm text-gray-500 mb-1">ROI</p>
-          <p className="text-2xl font-bold text-indigo-600">{(data.roi * 100).toFixed(1)}%</p>
+          <p className="text-sm text-gray-500 mb-1">ROI（收入/支出）</p>
+          <p className="text-2xl font-bold text-indigo-600">{data.roi.toFixed(2)}×</p>
         </div>
       </div>
 

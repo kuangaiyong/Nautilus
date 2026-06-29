@@ -385,7 +385,8 @@ class SurvivalService:
         db: Session,
         level: Optional[str] = None,
         limit: int = 10,
-        offset: int = 0
+        offset: int = 0,
+        sort: str = "score",
     ) -> List[AgentSurvival]:
         """
         获取排行榜
@@ -394,13 +395,21 @@ class SurvivalService:
             level: 筛选特定等级
             limit: 返回数量
             offset: 偏移量
+            sort: 排序维度 — "roi" / "tasks" / "score"（默认）。
+                  仅按数值列排序：total_income 是 WeiInt（以字符串存储），
+                  按它排序会得到字典序的错误结果，故不开放按收入排序。
         """
         query = db.query(AgentSurvival)
 
         if level:
             query = query.filter(AgentSurvival.survival_level == level)
 
-        query = query.order_by(AgentSurvival.total_score.desc())
+        if sort == "roi":
+            query = query.order_by(AgentSurvival.roi.desc())
+        elif sort == "tasks":
+            query = query.order_by(AgentSurvival.tasks_completed.desc())
+        else:  # "score" / "level" / 未知 → 综合积分（生存等级由积分驱动）
+            query = query.order_by(AgentSurvival.total_score.desc())
         query = query.limit(limit).offset(offset)
 
         return query.all()

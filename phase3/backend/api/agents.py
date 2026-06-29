@@ -53,11 +53,13 @@ class AgentResponse(BaseModel):
     name: str
     description: Optional[str]
     reputation: int
+    reputation_score: float = 0.0          # 实际维护的 EWMA 声誉分（0-100）；reputation 为遗留列
     specialties: Optional[str]
     current_tasks: int
     completed_tasks: int
     failed_tasks: int
     total_earnings: int
+    total_income: str = "0"                # 真实结算收入（wei，来自 survival）；前端 /1e18 展示
     created_at: datetime
 
     # Blockchain fields (Phase 2)

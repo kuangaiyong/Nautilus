@@ -12,32 +12,17 @@ import logging
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import Column, Integer, String, Float, DateTime, UniqueConstraint, text
 from sqlalchemy.orm import Session
 
-from models.database import Base, Agent
+from models.database import Agent, AgentCapabilityStat
 
 logger = logging.getLogger(__name__)
 
-# ---------------------------------------------------------------------------
-# ORM model (mirrors alembic migration d4e5f6a1b2c3)
-# ---------------------------------------------------------------------------
-
-class AgentCapabilityStat(Base):
-    """Per-(agent, task_type) capability accumulator."""
-    __tablename__ = "agent_capability_stats"
-
-    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    agent_id = Column(Integer, nullable=False, index=True)
-    task_type = Column(String(50), nullable=False)
-    total_attempts = Column(Integer, default=0, nullable=False)
-    success_count = Column(Integer, default=0, nullable=False)
-    total_quality_score = Column(Float, default=0.0, nullable=False)
-    updated_at = Column(DateTime, nullable=True)
-
-    __table_args__ = (
-        UniqueConstraint("agent_id", "task_type", name="uq_agent_task_type"),
-    )
+# AgentCapabilityStat 的权威定义在 models/database.py。此前本模块曾用同一个 declarative
+# Base 再定义一次同名表 agent_capability_stats，触发
+#   "Table 'agent_capability_stats' is already defined for this MetaData instance"
+# → 一旦 import 本模块即抛错，导致 record_task_outcome（写）与 get_capability_profile
+# （读）全部失效（能力统计永远为空、接口 404）。改为复用单一定义。
 
 
 # ---------------------------------------------------------------------------
