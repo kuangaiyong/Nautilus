@@ -32,11 +32,8 @@ export default function Header() {
             <Link to="/agents" className="hover:text-primary-400 transition">
               智能体
             </Link>
-            <Link to="/skills" className="hover:text-primary-400 transition">
-              技能市场
-            </Link>
-            <Link to="/collaborate" className="hover:text-primary-400 transition">
-              协作任务
+            <Link to="/se-board" className="hover:text-primary-400 transition">
+              工程任务看板
             </Link>
             <Link to="/onboard" className="hover:text-primary-400 transition">
               接入Agent
@@ -184,10 +181,10 @@ export default function Header() {
               智能体
             </Link>
             <Link
-              to="/collaborate"
+              to="/se-board"
               className="block hover:text-primary-400 transition"
             >
-              协作任务
+              工程任务看板
             </Link>
             <Link
               to="/onboard"

@@ -41,6 +41,7 @@ const FeedPage = lazy(() => import('./pages/FeedPage'))
 const SkillsPage = lazy(() => import('./pages/SkillsPage'))
 const CollaboratePage = lazy(() => import('./pages/CollaboratePage'))
 const AgentOnboardPage = lazy(() => import('./pages/AgentOnboardPage'))
+const SeBoardPage = lazy(() => import('./pages/SeBoardPage'))
 
 function App() {
   return (
@@ -89,6 +90,7 @@ function App() {
               <Route path="/tools" element={<SkillsPage />} />
               <Route path="/collaborate" element={<CollaboratePage />} />
               <Route path="/onboard" element={<AgentOnboardPage />} />
+              <Route path="/se-board" element={<SeBoardPage />} />
             </Routes>
           </Suspense>
         </Layout>

@@ -311,6 +311,50 @@ async def get_task(request: Request, task_id: int, db: Session = Depends(get_db)
     return task
 
 
+@router.get("/{task_id}/bids")
+async def get_task_bids(task_id: int, db: Session = Depends(get_db)):
+    """列出某 SE 任务的竞价记录（dmas_task_bids），按加权分降序。公开。"""
+    from models.database import DmasTaskBid, Agent
+    bids = (db.query(DmasTaskBid)
+            .filter(DmasTaskBid.task_id == task_id)
+            .order_by(DmasTaskBid.weight.desc())
+            .all())
+    out = []
+    for b in bids:
+        ag = db.query(Agent).filter(Agent.agent_id == b.agent_id).first()
+        out.append({
+            "agent_id": b.agent_id,
+            "agent_name": ag.name if ag else None,
+            "weight": round(b.weight, 1),
+            "bid_nau": b.bid_nau,
+            "status": b.status,
+            "created_at": b.created_at.isoformat() if b.created_at else None,
+        })
+    return out
+
+
+@router.get("/{task_id}/reviews")
+async def get_task_reviews(task_id: int, db: Session = Depends(get_db)):
+    """列出某 SE 任务的 3 专家评审打分与聚合结果（task_reviews）。公开。"""
+    from models.database import TaskReview, Agent
+    from services.se_pouw_flow import review_result
+    res = review_result(db, task_id)
+    rows = db.query(TaskReview).filter(TaskReview.task_id == task_id).all()
+    reviews = []
+    for r in rows:
+        ag = db.query(Agent).filter(Agent.agent_id == r.reviewer_agent_id).first()
+        reviews.append({
+            "reviewer_agent_id": r.reviewer_agent_id,
+            "reviewer_name": ag.name if ag else None,
+            "score": r.score,
+            "correctness": r.correctness,
+            "completeness": r.completeness,
+            "standards": r.standards,
+            "comment": r.comment,
+        })
+    return {"avg": res["avg"], "passed": res["passed"], "n": res["n"], "reviews": reviews}
+
+
 @router.post("/{task_id}/accept", response_model=TaskResponse)
 @limiter.limit("100/minute")
 async def accept_task(
