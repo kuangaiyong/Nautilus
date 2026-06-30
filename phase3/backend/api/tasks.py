@@ -766,6 +766,14 @@ async def complete_task(
     if se_pouw.is_se_task(task.task_type):
         from services.se_pouw_flow import run_expert_reviews
         _rev = run_expert_reviews(db, task.id)
+        if not _rev.get("complete"):
+            # 评审未完成：LLM 网关不可用导致有效评审不足 NUM_REVIEWERS。fail-closed —
+            # 不结算、不判 FAILED，任务保持 SUBMITTED，待评审服务恢复后重试。
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail={"error": {"code": "REVIEW_INCOMPLETE",
+                                  "message": f"专家评审未完成（有效评审 {_rev['n']}/{se_pouw.NUM_REVIEWERS}，评审服务暂不可用），请稍后重试"}},
+            )
         if not _rev["passed"]:
             task.status = TaskStatus.FAILED
             task.verified_at = datetime.now(timezone.utc)

@@ -64,8 +64,16 @@ class LocalKeyEncryptionProvider(KeyEncryptionProvider):
                 )
             logger.info("Master encryption key loaded from environment")
             return key
+        # 未设主密钥：非开发环境必须 fail-fast。随机生成会使重启后既有托管私钥永久
+        # 无法解密、华币资金锁死，绝不能在生产/内网静默发生。
+        env = os.getenv("ENVIRONMENT", "development").lower()
+        if env not in ("development", "dev", "test", "testing"):
+            raise RuntimeError(
+                "WALLET_MASTER_KEY 未设置：拒绝启动。生产/内网必须配置固定主密钥并妥善备份，"
+                "否则重启后所有托管钱包私钥将无法解密、华币资金锁死。"
+            )
         key = secrets.token_bytes(_KEY_LENGTH)
-        logger.warning("WALLET_MASTER_KEY not set — random key for dev mode only")
+        logger.warning("WALLET_MASTER_KEY not set — random key for %s mode only", env)
         return key
 
     def derive_key(self, address: str) -> bytes:
@@ -192,7 +200,7 @@ class WalletIssuerService:
             raise ValueError(f"Wallet not found: {wallet_id}")
         pk = self._decrypt_private_key(wallet)
         try:
-            return Account.sign_message(encode_defunct(text=message), private_key=pk).signature.hex()
+            return Account.sign_message(encode_defunct(text=message), private_key=bytes(pk)).signature.hex()
         finally:
             _zero_bytes(pk)
 
@@ -204,7 +212,7 @@ class WalletIssuerService:
             raise ValueError(f"Wallet not found: {wallet_id}")
         pk = self._decrypt_private_key(wallet)
         try:
-            return Account.sign_transaction(tx_dict, private_key=pk).raw_transaction.hex()
+            return Account.sign_transaction(tx_dict, private_key=bytes(pk)).raw_transaction.hex()
         finally:
             _zero_bytes(pk)
 
@@ -220,10 +228,11 @@ class WalletIssuerService:
             "usdt": config.get_usdt_balance(address),
         }
 
-    def _decrypt_private_key(self, wallet) -> bytes:
-        return self._encryption.decrypt(
+    def _decrypt_private_key(self, wallet) -> bytearray:
+        # bytearray（可变）以便用后 _zero_bytes 真正清零明文私钥（bytes 不可变，清零为 no-op）。
+        return bytearray(self._encryption.decrypt(
             base64.b64decode(wallet.encrypted_private_key), wallet.public_address,
-        )
+        ))
 
 
 # ---------------------------------------------------------------------------
@@ -337,6 +346,7 @@ def pay_hua_from_custodial(db, from_user, to_address: str, amount_units: int) ->
     from web3 import Web3
     from blockchain.web3_config import get_web3_config
     from models.database import Wallet
+    from services.nonce_lock import account_nonce_lock
 
     config = get_web3_config()
     if config.hua_contract is None:
@@ -362,18 +372,23 @@ def pay_hua_from_custodial(db, from_user, to_address: str, amount_units: int) ->
     except Exception as exc:
         raise ValueError(f"奖励支付无法完成（余额不足或被合约拒绝）：{exc}") from exc
 
-    tx = config.hua_contract.functions.transfer(to_addr, amount_units).build_transaction({
-        "from": from_addr,
-        "nonce": w3.eth.get_transaction_count(from_addr, "pending"),
-        "gas": 100000,
-        "gasPrice": 0,
-        "chainId": config.chain_id,
-    })
-    pk = _get_local_encryption().decrypt(
+    pk = bytearray(_get_local_encryption().decrypt(
         base64.b64decode(wallet.encrypted_private_key), wallet.public_address
-    )
-    signed = w3.eth.account.sign_transaction(tx, pk)
-    tx_hash = w3.eth.send_raw_transaction(signed.raw_transaction)
+    ))
+    try:
+        # 串行化同一签名账户的 nonce 获取→广播，避免并发结算撞同一 nonce 被链拒。
+        with account_nonce_lock(from_addr):
+            tx = config.hua_contract.functions.transfer(to_addr, amount_units).build_transaction({
+                "from": from_addr,
+                "nonce": w3.eth.get_transaction_count(from_addr, "pending"),
+                "gas": 100000,
+                "gasPrice": 0,
+                "chainId": config.chain_id,
+            })
+            signed = w3.eth.account.sign_transaction(tx, bytes(pk))
+            tx_hash = w3.eth.send_raw_transaction(signed.raw_transaction)
+    finally:
+        _zero_bytes(pk)  # 真正擦除明文私钥（bytearray 可原地清零）
     receipt = w3.eth.wait_for_transaction_receipt(tx_hash, timeout=60)
     if receipt["status"] != 1:
         raise ValueError("奖励支付交易上链失败（status=0）")

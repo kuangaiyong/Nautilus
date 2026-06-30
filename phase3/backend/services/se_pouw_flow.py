@@ -119,8 +119,12 @@ _REVIEW_SYSTEM = (
 )
 
 
-def select_reviewers(db: Session, task) -> list:
-    """选评审专家：排除执行者与发布者；对口专长优先、声誉降序，取前 NUM_REVIEWERS 个。"""
+def select_reviewers(db: Session, task, limit: Optional[int] = None) -> list:
+    """候选评审专家：排除执行者与发布者；对口专长优先、声誉降序。
+
+    limit=None 返回全部合格候选（供 run_expert_reviews 在某评审 degraded 时换人补齐），
+    否则取前 limit 个。
+    """
     from models.database import Agent
 
     cands = db.query(Agent).all()
@@ -135,7 +139,7 @@ def select_reviewers(db: Session, task) -> list:
         out.append(a)
     out.sort(key=lambda a: (1 if se_pouw.specialty_match(task.task_type, a.specialties) else 0,
                             float(a.reputation_score or 50.0)), reverse=True)
-    return out[:se_pouw.NUM_REVIEWERS]
+    return out if limit is None else out[:limit]
 
 
 def _review_one(info: dict) -> dict:
@@ -181,29 +185,33 @@ def _review_one(info: dict) -> dict:
                 "completeness": clamp(data.get("completeness", sc)),
                 "standards": clamp(data.get("standards", sc)),
                 "comment": str(data.get("comment", ""))[:500],
+                "degraded": False,
             }
         except Exception as exc:
             last_err = str(exc)
             continue
-    logger.warning("se review LLM 无有效评分(task=%s): %s -> 回落中性分", info.get("id"), last_err)
+    logger.warning("se review LLM 无有效评分(task=%s): %s -> 标记 degraded(不持久化)", info.get("id"), last_err)
     return {"score": 3.0, "correctness": 3.0, "completeness": 3.0, "standards": 3.0,
-            "comment": f"LLM 评审无有效输出，回落中性分（{last_err}）"}
+            "comment": f"LLM 评审无有效输出（{last_err}）", "degraded": True}
 
 
 def run_expert_reviews(db: Session, task_id: int) -> dict:
-    """为 SE 任务选 3 评审、各自 LLM 打分并入库（幂等：已评够则直接返回聚合）。"""
+    """为 SE 任务凑齐 NUM_REVIEWERS 个"有效"专家 LLM 评分并入库（幂等可补齐）。
+
+    某次评分 degraded（空响应/格式错/网关不可用）时不持久化、改从候选池换下一个智能体
+    补评，直到凑够 NUM_REVIEWERS 个有效评审或候选耗尽。LLM 持续不可用 → 有效评审不足 →
+    review_result.complete=False，complete 端点据此 fail-closed（不结算、不判失败、可重试），
+    避免 LLM 抖动期间垃圾交付物靠回落分"通过"。串行换人补齐，对单点 LLM 抖动稳健。
+    """
     from models.database import Task, TaskReview
 
     task = db.query(Task).filter(Task.id == task_id).first()
     if not task:
-        return {"avg": 0.0, "passed": False, "n": 0, "reviews": []}
+        return {"avg": 0.0, "passed": False, "n": 0, "complete": False, "reviews": []}
     done = {r.reviewer_agent_id for r in db.query(TaskReview).filter(TaskReview.task_id == task_id).all()}
-    if len(done) >= se_pouw.NUM_REVIEWERS:
-        return review_result(db, task_id)
-
-    reviewers = [r for r in select_reviewers(db, task) if r.agent_id not in done]
-    if reviewers:
-        # 纯值快照供线程并行 LLM 评审，避免跨线程访问 ORM 对象
+    need = se_pouw.NUM_REVIEWERS - len(done)
+    if need > 0:
+        # 纯值快照（_review_one 只读这些，避免跨调用持有 ORM 对象）
         info = {
             "id": task.id,
             "task_type": task.task_type.value if hasattr(task.task_type, "value") else str(task.task_type),
@@ -211,20 +219,28 @@ def run_expert_reviews(db: Session, task_id: int) -> dict:
             "expected_output": task.expected_output or "",
             "result": getattr(task, "result", None) or "",
         }
-        import concurrent.futures
-        with concurrent.futures.ThreadPoolExecutor(max_workers=len(reviewers)) as ex:
-            scores = list(ex.map(lambda _r: _review_one(info), reviewers))  # 3 个评审并行
-        for reviewer, sc in zip(reviewers, scores):
+        pool = [a for a in select_reviewers(db, task, limit=None) if a.agent_id not in done]
+        persisted = 0
+        for agent in pool:
+            if persisted >= need:
+                break
+            sc = _review_one(info)
+            if sc.get("degraded"):
+                continue  # 该次 LLM 无有效评分：换下一个候选补评（degraded 不持久化）
             db.add(TaskReview(
-                task_id=task_id, reviewer_agent_id=reviewer.agent_id,
+                task_id=task_id, reviewer_agent_id=agent.agent_id,
                 score=sc["score"], correctness=sc["correctness"],
                 completeness=sc["completeness"], standards=sc["standards"],
                 comment=sc["comment"], created_at=datetime.utcnow(),
             ))
-        db.commit()
+            persisted += 1
+        if persisted:
+            db.commit()
+        else:
+            db.rollback()  # 无任何有效评审，避免悬挂事务
     res = review_result(db, task_id)
-    logger.info("run_expert_reviews: task=%s reviewers=%d avg=%.2f passed=%s",
-                task_id, res["n"], res["avg"], res["passed"])
+    logger.info("run_expert_reviews: task=%s reviewers=%d avg=%.2f passed=%s complete=%s",
+                task_id, res["n"], res["avg"], res["passed"], res["complete"])
     return res
 
 
@@ -234,6 +250,9 @@ def review_result(db: Session, task_id: int) -> dict:
 
     rows = db.query(TaskReview).filter(TaskReview.task_id == task_id).all()
     agg = se_pouw.aggregate_reviews([r.score for r in rows])
+    # complete: 是否已积累到 NUM_REVIEWERS 个有效评审。complete 端点据此 fail-closed：
+    # LLM 不可用导致有效评审不足时，不结算、不判失败，保持任务可重试。
+    agg["complete"] = agg["n"] >= se_pouw.NUM_REVIEWERS
     agg["reviews"] = [{"reviewer_agent_id": r.reviewer_agent_id, "score": r.score,
                        "comment": r.comment} for r in rows]
     return agg

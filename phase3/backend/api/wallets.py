@@ -15,7 +15,7 @@ from sqlalchemy import select
 from models.database import User, Wallet
 from utils.database import get_db
 from utils.auth import get_current_user, get_current_admin_user
-from services.key_encryption_provider import LocalKeyEncryptionProvider
+from services.wallet import LocalKeyEncryptionProvider
 
 logger = logging.getLogger(__name__)
 
@@ -135,7 +135,7 @@ def _get_wallet_service(db: Session):
     session so callers can still ``await`` its methods (SQLAlchemy sync
     sessions silently support this when running inside ``asyncio``).
     """
-    from services.wallet_issuer_service import WalletIssuerService
+    from services.wallet import WalletIssuerService
     return WalletIssuerService(db, _encryption_provider)  # type: ignore[arg-type]
 
 
@@ -493,7 +493,8 @@ def transfer_hua(
     """
     from web3 import Web3
     from blockchain.web3_config import get_web3_config
-    from services.wallet import _get_local_encryption
+    from services.wallet import _get_local_encryption, _zero_bytes
+    from services.nonce_lock import account_nonce_lock
 
     wallet = db.query(Wallet).filter(Wallet.wallet_id == wallet_id).first()
     if wallet is None:
@@ -546,20 +547,22 @@ def transfer_hua(
                               "details": {"reason": str(exc)}}},
         )
 
+    # 解密托管私钥（bytearray 便于用后原地清零）；与 ensure_user_wallet 加密用同一
+    # provider 单例，故 WALLET_MASTER_KEY 未设(dev)时也能解出。
+    pk = bytearray(_get_local_encryption().decrypt(
+        base64.b64decode(wallet.encrypted_private_key), wallet.public_address
+    ))
     try:
-        tx = config.hua_contract.functions.transfer(to_addr, amount_units).build_transaction({
-            "from": from_addr,
-            "nonce": w3.eth.get_transaction_count(from_addr, "pending"),
-            "gas": 100000,
-            "gasPrice": 0,
-            "chainId": config.chain_id,
-        })
-        # Decrypt with the same provider singleton that ensure_user_wallet used
-        # to encrypt, so this works even when WALLET_MASTER_KEY is unset (dev).
-        pk = _get_local_encryption().decrypt(
-            base64.b64decode(wallet.encrypted_private_key), wallet.public_address
-        )
-        tx_hash_hex = _sign_and_send_local(w3, tx, pk)
+        # 串行化同一账户"取 nonce(pending)→广播"，避免与任务结算/其它转账撞同一 nonce。
+        with account_nonce_lock(from_addr):
+            tx = config.hua_contract.functions.transfer(to_addr, amount_units).build_transaction({
+                "from": from_addr,
+                "nonce": w3.eth.get_transaction_count(from_addr, "pending"),
+                "gas": 100000,
+                "gasPrice": 0,
+                "chainId": config.chain_id,
+            })
+            tx_hash_hex = _sign_and_send_local(w3, tx, bytes(pk))
     except Exception as exc:
         logger.error("HUA transfer failed for wallet %s: %s", wallet_id, exc)
         raise HTTPException(
@@ -568,6 +571,8 @@ def transfer_hua(
                               "message": "华币转账失败",
                               "details": {"reason": str(exc)}}},
         )
+    finally:
+        _zero_bytes(pk)  # 真正擦除明文私钥（bytearray 可原地清零）
 
     return TransferResponse(
         tx_hash=tx_hash_hex,
@@ -605,6 +610,7 @@ def mint_hua(
     """
     from web3 import Web3
     from blockchain.web3_config import get_web3_config
+    from services.nonce_lock import account_nonce_lock
 
     config = get_web3_config()
     if not config.hua_address:
@@ -642,12 +648,15 @@ def mint_hua(
     units = w3.to_wei(Decimal(str(body.amount)), "ether")
 
     try:
-        tx = hua.functions.mint(to_addr, units).build_transaction({
-            "from": owner.address,
-            "nonce": w3.eth.get_transaction_count(owner.address, "pending"),
-            "gas": 120000, "gasPrice": 0, "chainId": config.chain_id,
-        })
-        tx_hash_hex = _sign_and_send_local(w3, tx, owner_pk)
+        # 串行化 owner 账户"取 nonce(pending)→广播"，与 NAU 铸币(同一 minter 账户)共享
+        # per-account 锁，避免并发铸币撞同一 nonce 致部分丢失。
+        with account_nonce_lock(owner.address):
+            tx = hua.functions.mint(to_addr, units).build_transaction({
+                "from": owner.address,
+                "nonce": w3.eth.get_transaction_count(owner.address, "pending"),
+                "gas": 120000, "gasPrice": 0, "chainId": config.chain_id,
+            })
+            tx_hash_hex = _sign_and_send_local(w3, tx, owner_pk)
     except Exception as exc:
         logger.error("HUA mint to %s failed: %s", to_addr, exc)
         raise HTTPException(

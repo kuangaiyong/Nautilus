@@ -10,20 +10,22 @@ Run: C:/nautilus-venv/Scripts/python.exe tests/e2e_admin_mint.py
 """
 import os
 import sys
-import sqlite3
 import secrets
 
 import requests
 from dotenv import load_dotenv
 from web3 import Web3
 
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 load_dotenv()
+
+import models.agent_survival  # noqa: F401  注册 AgentSurvival mapper（Agent 跨模块 relationship）
+from utils.database import SessionLocal
+from models.database import User
 
 API = os.getenv("E2E_API", "http://127.0.0.1:8000")
 RPC = os.getenv("PRIVATE_RPC", "http://127.0.0.1:8545")
 HUA = Web3.to_checksum_address(os.getenv("HUA_TOKEN_ADDRESS"))
-DB_URL = os.getenv("DATABASE_URL", "sqlite:///./nautilus_private.db")
-DB_PATH = DB_URL.replace("sqlite:///", "").lstrip("./") or "nautilus_private.db"
 
 BAL_ABI = [{"inputs": [{"name": "a", "type": "address"}], "name": "balanceOf",
             "outputs": [{"name": "", "type": "uint256"}], "stateMutability": "view",
@@ -51,12 +53,16 @@ def me(token):
 
 
 def promote_admin(username):
-    con = sqlite3.connect(DB_PATH)
-    con.execute("UPDATE users SET is_admin = 1 WHERE username = ?", (username,))
-    con.commit()
-    changed = con.total_changes
-    con.close()
-    return changed
+    db = SessionLocal()
+    try:
+        u = db.query(User).filter(User.username == username).first()
+        if u is None:
+            return 0
+        u.is_admin = True
+        db.commit()
+        return 1
+    finally:
+        db.close()
 
 
 def bal(addr):

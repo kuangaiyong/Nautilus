@@ -11,6 +11,7 @@ from typing import Optional
 
 import redis as redis_lib
 from blockchain.web3_config import get_web3_config, get_w3, BLOCKCHAIN_PRIVATE_KEY
+from services.nonce_lock import account_nonce_lock
 from web3 import Web3
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
@@ -80,20 +81,21 @@ class NautilusTokenService:
                 return None
 
             checksum_wallet = Web3.to_checksum_address(agent_wallet)
-            nonce = w3.eth.get_transaction_count(account)
-
-            tx = cfg.nau_contract.functions.mintForTask(
-                checksum_wallet,
-                amount_wei,
-                task_type,
-            ).build_transaction({
-                "from": account,
-                "nonce": nonce,
-                "chainId": cfg.chain_id,
-            })
-
-            signed = w3.eth.account.sign_transaction(tx, BLOCKCHAIN_PRIVATE_KEY)
-            tx_hash = w3.eth.send_raw_transaction(signed.raw_transaction)
+            # 串行化 minter 账户的"取 nonce(pending)→广播"，防并发铸币撞同一 nonce 致部分丢失。
+            # 与 api.wallets.mint_hua（同一 minter 账户铸华币）共享 per-account 锁。
+            with account_nonce_lock(account):
+                nonce = w3.eth.get_transaction_count(account, "pending")
+                tx = cfg.nau_contract.functions.mintForTask(
+                    checksum_wallet,
+                    amount_wei,
+                    task_type,
+                ).build_transaction({
+                    "from": account,
+                    "nonce": nonce,
+                    "chainId": cfg.chain_id,
+                })
+                signed = w3.eth.account.sign_transaction(tx, BLOCKCHAIN_PRIVATE_KEY)
+                tx_hash = w3.eth.send_raw_transaction(signed.raw_transaction)
             tx_hash_hex = tx_hash.hex()
 
             logger.info(
@@ -170,18 +172,22 @@ class NautilusTokenService:
                 continue
             try:
                 amount_wei = nau_amount * (10 ** _NAU_DECIMALS)
-                nonce = w3.eth.get_transaction_count(account) + len(tx_hashes)
-                tx = cfg.nau_contract.functions.mintForTask(
-                    Web3.to_checksum_address(wallet),
-                    amount_wei,
-                    f"{task_type}:{role}",
-                ).build_transaction({
-                    "from": account,
-                    "nonce": nonce,
-                    "chainId": cfg.chain_id,
-                })
-                signed = w3.eth.account.sign_transaction(tx, BLOCKCHAIN_PRIVATE_KEY)
-                tx_hash = w3.eth.send_raw_transaction(signed.raw_transaction)
+                # 与 mint_task_reward / mint_hua 共享 minter 账户的 per-account 锁，
+                # 串行化"取 pending nonce→广播"：用 pending（而非 latest+len 偏移）才能
+                # 反映 mempool 中本批已广播未出块的交易，避免与并发铸币撞同一 nonce。
+                with account_nonce_lock(account):
+                    nonce = w3.eth.get_transaction_count(account, "pending")
+                    tx = cfg.nau_contract.functions.mintForTask(
+                        Web3.to_checksum_address(wallet),
+                        amount_wei,
+                        f"{task_type}:{role}",
+                    ).build_transaction({
+                        "from": account,
+                        "nonce": nonce,
+                        "chainId": cfg.chain_id,
+                    })
+                    signed = w3.eth.account.sign_transaction(tx, BLOCKCHAIN_PRIVATE_KEY)
+                    tx_hash = w3.eth.send_raw_transaction(signed.raw_transaction)
                 tx_hashes.append(tx_hash.hex())
                 logger.info("Minted %d NAU to %s (%s), tx: %s",
                             nau_amount, wallet, role, tx_hash.hex())

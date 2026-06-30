@@ -4,9 +4,7 @@ Code Executor - Generates and executes code tasks using LLM + Docker sandbox.
 import docker
 import tempfile
 import os
-import sys
 import json
-import subprocess
 from typing import Dict, Any
 import logging
 
@@ -22,7 +20,10 @@ class CodeExecutor:
             self.docker_client = docker.from_env()
             logger.info("Docker client initialized")
         except Exception as e:
-            logger.warning(f"Docker not available, will use direct execution: {e}")
+            logger.warning(
+                "Docker not available — code execution will be REFUSED (no host "
+                "fallback, for security): %s", e,
+            )
             self.docker_client = None
 
     @property
@@ -100,13 +101,24 @@ Respond with ONLY Python code in ```python ... ``` markers."""
         return _extract_code(response)
 
     async def _run_code(self, code: str) -> str:
-        """Run code in Docker sandbox or directly."""
-        if self.docker_client:
-            return await self._run_in_docker(code)
-        return await self._run_directly(code)
+        """Run code in an isolated Docker sandbox.
+
+        SECURITY: if Docker is unavailable we REFUSE to run — never fall back to
+        executing untrusted (LLM- or task-supplied) code on the host. The backend
+        process can read .env (WALLET_MASTER_KEY / BLOCKCHAIN_PRIVATE_KEY) and
+        custodial private keys, so host execution is a remote-code-execution /
+        key-theft vector. The generated code is still delivered to the caller;
+        only the run-output is skipped (see execute()'s try/except).
+        """
+        if not self.docker_client:
+            raise RuntimeError(
+                "安全沙箱(Docker)不可用，已拒绝在宿主直接执行不可信代码（防 RCE / 私钥窃取）"
+            )
+        return await self._run_in_docker(code)
 
     async def _run_in_docker(self, code: str) -> str:
-        """Run code in Docker container (non-blocking)."""
+        """Run code in Docker container (non-blocking), with a hard wall-clock
+        timeout so a runaway / while-True submission cannot pin the worker."""
         import asyncio
 
         def _docker_run(code_text):
@@ -116,40 +128,36 @@ Respond with ONLY Python code in ```python ... ``` markers."""
                 code_file = os.path.join(tmpdir, "solution.py")
                 with open(code_file, "w") as f:
                     f.write(code_text)
+                # detach so we can enforce a wall-clock timeout and kill a hung container.
+                container = self.docker_client.containers.run(
+                    image="nautilus-scientific:latest",
+                    command="python solution.py",
+                    volumes={tmpdir: {"bind": "/workspace", "mode": "rw"}},
+                    working_dir="/workspace",
+                    mem_limit="512m",
+                    cpu_quota=100000,
+                    network_mode="none",
+                    detach=True, stdout=True, stderr=True,
+                )
                 try:
-                    result = self.docker_client.containers.run(
-                        image="nautilus-scientific:latest",
-                        command="python solution.py",
-                        volumes={tmpdir: {"bind": "/workspace", "mode": "rw"}},
-                        working_dir="/workspace",
-                        mem_limit="512m",
-                        cpu_quota=100000,
-                        network_mode="none",
-                        remove=True, detach=False, stdout=True, stderr=True,
-                    )
-                    return result.decode("utf-8")
-                except docker.errors.ContainerError as e:
-                    stderr = e.stderr.decode("utf-8") if e.stderr else str(e)
-                    raise RuntimeError(f"Code execution failed: {stderr}")
+                    result = container.wait(timeout=60)  # 墙钟超时：超时抛异常 → 下方 kill
+                    logs = container.logs(stdout=True, stderr=True).decode("utf-8")
+                    if result.get("StatusCode", 0) != 0:
+                        raise RuntimeError(f"Code execution failed: {logs}")
+                    return logs
+                except Exception:
+                    try:
+                        container.kill()
+                    except Exception:
+                        pass
+                    raise
+                finally:
+                    try:
+                        container.remove(force=True)
+                    except Exception:
+                        pass
 
         return await asyncio.to_thread(_docker_run, code)
-
-    async def _run_directly(self, code: str) -> str:
-        """Run code directly (fallback when Docker unavailable)."""
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
-            f.write(code)
-            temp_path = f.name
-
-        try:
-            result = subprocess.run(
-                [sys.executable, temp_path],  # 用当前(venv)解释器，避免依赖 PATH 上的 python
-                capture_output=True, text=True, timeout=30,
-            )
-            if result.returncode != 0:
-                raise RuntimeError(f"Code execution failed:\n{result.stderr}")
-            return result.stdout
-        finally:
-            os.unlink(temp_path)
 
     async def run_tests(self, code: str, tests: str) -> Dict[str, Any]:
         """Run unit tests on code."""
