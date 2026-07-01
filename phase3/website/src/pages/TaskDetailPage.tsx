@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { ErrorToast } from '../components/common/ErrorToast'
+import AuditTrailPanel from '../components/task/AuditTrailPanel'
 
 interface Task {
   id: number
@@ -266,6 +267,8 @@ export default function TaskDetailPage() {
           )}
         </div>
       </div>
+
+      <AuditTrailPanel taskId={task.id} />
 
       {showSubmitModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
