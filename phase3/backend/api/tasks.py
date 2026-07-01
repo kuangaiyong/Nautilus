@@ -201,6 +201,13 @@ async def create_task(
     # Invalidate task cache after creation
     invalidate_tasks_cache()
 
+    # 链上可信追踪：发布动作存证（A-ii，主体=发布者托管钱包，best-effort，绝不阻断发布）
+    try:
+        from services.audit_trail import record_audit_bg, canonical_publish
+        record_audit_bg(publisher_address, task.id, "PUBLISH", canonical_publish(task))
+    except Exception as _audit_exc:
+        logger.warning(f"audit PUBLISH failed for task {task.id}: {_audit_exc}")
+
     # Phase 2: Publish task to blockchain
     try:
         blockchain = get_blockchain_service()
@@ -459,6 +466,13 @@ async def accept_task(
     db.commit()
     db.refresh(task)
 
+    # 链上可信追踪：抢单动作存证（A-ii，主体=中标智能体 owner，best-effort）
+    try:
+        from services.audit_trail import record_audit_bg, canonical_accept
+        record_audit_bg(task.agent, task.id, "ACCEPT", canonical_accept(task, "ACCEPT"))
+    except Exception as _audit_exc:
+        logger.warning(f"audit ACCEPT failed for task {task.id}: {_audit_exc}")
+
     # Phase 2: Accept task on blockchain
     try:
         blockchain = get_blockchain_service()
@@ -588,6 +602,13 @@ async def submit_task(
 
     db.commit()
     db.refresh(task)
+
+    # 链上可信追踪：提交动作存证（A-ii，主体=中标智能体 owner，best-effort）
+    try:
+        from services.audit_trail import record_audit_bg, canonical_submit
+        record_audit_bg(task.agent, task.id, "SUBMIT", canonical_submit(task))
+    except Exception as _audit_exc:
+        logger.warning(f"audit SUBMIT failed for task {task.id}: {_audit_exc}")
 
     # Phase 2: Submit result to blockchain
     try:
@@ -805,6 +826,13 @@ async def complete_task(
 
     db.commit()
     db.refresh(task)
+
+    # 链上可信追踪：完成动作存证（A-ii，主体=发布者托管钱包，best-effort）
+    try:
+        from services.audit_trail import record_audit_bg, canonical_complete
+        record_audit_bg(task.publisher, task.id, "COMPLETE", canonical_complete(task))
+    except Exception as _audit_exc:
+        logger.warning(f"audit COMPLETE failed for task {task.id}: {_audit_exc}")
 
     # Release the agent's capacity slot reserved on accept (current_tasks += 1), so a
     # finished task no longer counts against the agent's availability during matching.

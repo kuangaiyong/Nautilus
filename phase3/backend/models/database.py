@@ -464,3 +464,30 @@ class TaskReview(Base):
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
     __table_args__ = (UniqueConstraint("task_id", "reviewer_agent_id", name="uq_review_task_reviewer"),)
+
+
+class AuditLog(Base):
+    """链上可信追踪存证记录（方案 A-ii）。
+
+    每条对应任务生命周期一个动作的哈希锚定：由动作主体（智能体 / 发布者的托管钱包）
+    亲自向 TaskAuditTrail 合约 record 一次。本表是链下索引 + 重试队列，权威数据在链上事件；
+    校验时以链上事件为准，用源表(Task / TaskReview)重算哈希比对，证明链下记录未被篡改。
+    """
+    __tablename__ = "audit_logs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    task_id = Column(Integer, nullable=False, index=True)         # tasks.id
+    action = Column(String(20), nullable=False, index=True)       # PUBLISH/ACCEPT/AWARD/SUBMIT/REVIEW/COMPLETE
+    actor_address = Column(String(42), nullable=False, index=True)
+    content_hash = Column(String(66), nullable=False)             # 0x + 64 hex（规范化原文 keccak256）
+    ref_id = Column(Integer, nullable=True)                       # 关联子记录（如 REVIEW → task_reviews.id）
+    tx_hash = Column(String(66), nullable=True, index=True)
+    onchain_seq = Column(Integer, nullable=True)                  # 合约事件全局序号
+    status = Column(String(20), nullable=False, default="pending", index=True)  # pending/confirmed/failed
+    error = Column(Text, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
+    confirmed_at = Column(DateTime, nullable=True)
+
+    __table_args__ = (
+        Index('idx_audit_task_action', 'task_id', 'action'),
+    )

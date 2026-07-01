@@ -52,6 +52,7 @@ logs/
 phase3/privatechain/data/
 phase3/privatechain/keystore/
 phase3/contracts/deployed_private.json
+phase3/contracts/deployed_audit_trail.json
 phase3/backend/.env
 phase3/backend/.env.production
 phase3/backend/.env.staging

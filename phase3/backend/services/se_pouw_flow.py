@@ -85,6 +85,13 @@ def award_se_task(db: Session, task_id: int) -> Optional[int]:
     for b in bids:
         b.status = "won" if b.id == winner.id else "lost"
     db.commit()
+    # 链上可信追踪：派单动作存证（A-ii，主体=中标智能体 owner；SE 任务的"抢到任务"入口）
+    try:
+        db.refresh(task)  # 取 DB 值（accepted_at 秒精度），保证与校验重算一致
+        from services.audit_trail import record_audit_bg, canonical_accept
+        record_audit_bg(task.agent, task.id, "AWARD", canonical_accept(task, "AWARD"))
+    except Exception as _audit_exc:
+        logger.warning("audit AWARD failed task=%s: %s", task_id, _audit_exc)
     logger.info("award_se_task: task=%s winner_agent=%s weight=%.1f (bids=%d)",
                 task_id, winner.agent_id, winner.weight, len(bids))
     return winner.agent_id
@@ -195,6 +202,21 @@ def _review_one(info: dict) -> dict:
             "comment": f"LLM 评审无有效输出（{last_err}）", "degraded": True}
 
 
+def _record_review_audits(db, task_id, new_reviews) -> None:
+    """评审入库后逐条链上存证（A-ii，主体=评审专家 owner；best-effort，绝不影响评审流程）。"""
+    try:
+        from services.audit_trail import record_audit_bg, canonical_review
+    except Exception:
+        return
+    for review, owner in new_reviews:
+        try:
+            db.refresh(review)  # 取 DB 值（created_at 秒精度），保证与校验重算一致
+            record_audit_bg(owner, task_id, "REVIEW",
+                            canonical_review(task_id, review, owner), ref_id=review.id)
+        except Exception as exc:
+            logger.warning("audit REVIEW failed task=%s reviewer=%s: %s", task_id, review.reviewer_agent_id, exc)
+
+
 def run_expert_reviews(db: Session, task_id: int) -> dict:
     """为 SE 任务凑齐 NUM_REVIEWERS 个"有效"专家 LLM 评分并入库（幂等可补齐）。
 
@@ -221,21 +243,25 @@ def run_expert_reviews(db: Session, task_id: int) -> dict:
         }
         pool = [a for a in select_reviewers(db, task, limit=None) if a.agent_id not in done]
         persisted = 0
+        new_reviews = []  # (review_obj, reviewer_owner)，供 commit 后逐条链上存证
         for agent in pool:
             if persisted >= need:
                 break
             sc = _review_one(info)
             if sc.get("degraded"):
                 continue  # 该次 LLM 无有效评分：换下一个候选补评（degraded 不持久化）
-            db.add(TaskReview(
+            review = TaskReview(
                 task_id=task_id, reviewer_agent_id=agent.agent_id,
                 score=sc["score"], correctness=sc["correctness"],
                 completeness=sc["completeness"], standards=sc["standards"],
                 comment=sc["comment"], created_at=datetime.utcnow(),
-            ))
+            )
+            db.add(review)
+            new_reviews.append((review, agent.owner))
             persisted += 1
         if persisted:
             db.commit()
+            _record_review_audits(db, task_id, new_reviews)
         else:
             db.rollback()  # 无任何有效评审，避免悬挂事务
     res = review_result(db, task_id)

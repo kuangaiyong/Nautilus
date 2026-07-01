@@ -210,6 +210,14 @@ async def auto_assign_task(
         task.accepted_at = datetime.now(timezone.utc)  # 与手动 accept 一致，供完成时计算任务时长
         db.commit()
 
+        # 链上可信追踪：自动派单抢单存证（A-ii，主体=中标智能体 owner；与 HTTP accept 对齐）
+        try:
+            db.refresh(task)
+            from services.audit_trail import record_audit_bg, canonical_accept
+            record_audit_bg(agent.owner, task.id, "ACCEPT", canonical_accept(task, "ACCEPT"))
+        except Exception as _audit_exc:
+            logger.warning(f"audit ACCEPT(auto) failed for task {task.id}: {_audit_exc}")
+
         logger.info(f"✅ Task {task_id} auto-assigned to agent {agent.agent_id} "
                    f"(score: {best_match['score']:.2f})")
 

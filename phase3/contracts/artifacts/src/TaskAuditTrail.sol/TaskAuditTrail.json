@@ -1,0 +1,115 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "TaskAuditTrail",
+  "sourceName": "src/TaskAuditTrail.sol",
+  "abi": [
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "taskId",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "uint8",
+          "name": "action",
+          "type": "uint8"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "actor",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "bytes32",
+          "name": "contentHash",
+          "type": "bytes32"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "timestamp",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "seq",
+          "type": "uint256"
+        }
+      ],
+      "name": "AuditRecord",
+      "type": "event"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "taskId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint8",
+          "name": "action",
+          "type": "uint8"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "contentHash",
+          "type": "bytes32"
+        }
+      ],
+      "name": "record",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "seq",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "taskRecordCount",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "totalRecords",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x6080806040523461001657610146908161001c8239f35b600080fdfe6080604090808252600436101561001557600080fd5b600090813560e01c908163125f8974146100f6575080632a191c2e146100c95763d08876f91461004457600080fd5b346100c65760603660031901126100c657600435916024359260ff84168094036100c257602093828454946001860181558381526001875220600181540190558251916044358352428684015284848401527f190f32312504aa4e6209286cdce5029ed41a3f3dde28e9af2de1c440e850bf8960603394a451908152f35b8280fd5b80fd5b5090346100f25760203660031901126100f2578060209260043581526001845220549051908152f35b5080fd5b9050346100f257816003193601126100f257602091548152f3fea26469706673582212201979aaeaccbbad46fc6fb192c20bac0b5c53cba040ec03851017f9037e3c1e9164736f6c63430008150033",
+  "deployedBytecode": "0x6080604090808252600436101561001557600080fd5b600090813560e01c908163125f8974146100f6575080632a191c2e146100c95763d08876f91461004457600080fd5b346100c65760603660031901126100c657600435916024359260ff84168094036100c257602093828454946001860181558381526001875220600181540190558251916044358352428684015284848401527f190f32312504aa4e6209286cdce5029ed41a3f3dde28e9af2de1c440e850bf8960603394a451908152f35b8280fd5b80fd5b5090346100f25760203660031901126100f2578060209260043581526001845220549051908152f35b5080fd5b9050346100f257816003193601126100f257602091548152f3fea26469706673582212201979aaeaccbbad46fc6fb192c20bac0b5c53cba040ec03851017f9037e3c1e9164736f6c63430008150033",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}

@@ -56,6 +56,9 @@ IDENTITY_CONTRACT_ADDRESS = os.getenv("IDENTITY_CONTRACT_ADDRESS", "")
 # NAU Token contract (Proof of Useful Work)
 NAU_TOKEN_ADDRESS = os.getenv("NAU_TOKEN_ADDRESS", "")
 
+# TaskAuditTrail contract (任务生命周期链上可信追踪存证，方案 A-ii)
+AUDIT_TRAIL_ADDRESS = os.getenv("AUDIT_TRAIL_ADDRESS", "")
+
 # Private key (for server-side signing: verification engine, etc.)
 BLOCKCHAIN_PRIVATE_KEY = os.getenv("BLOCKCHAIN_PRIVATE_KEY", "")
 
@@ -131,6 +134,13 @@ class Web3Config:
             logger.info(f"NAU token contract loaded at {NAU_TOKEN_ADDRESS}")
         else:
             logger.warning("NAU_TOKEN_ADDRESS not set — token minting disabled")
+
+        # TaskAuditTrail contract (链上可信追踪存证)
+        self.audit_contract = self._load_contract("TaskAuditTrail", AUDIT_TRAIL_ADDRESS) if AUDIT_TRAIL_ADDRESS else None
+        if self.audit_contract:
+            logger.info(f"TaskAuditTrail contract loaded at {AUDIT_TRAIL_ADDRESS}")
+        else:
+            logger.warning("AUDIT_TRAIL_ADDRESS not set — on-chain audit trail disabled")
 
     def _load_contract(self, abi_name: str, address: str):
         if not address:

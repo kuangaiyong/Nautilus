@@ -184,6 +184,14 @@ async def execute_task_by_agent(
             task.submitted_at = end_time
             db.commit()
 
+        # 链上可信追踪：自动执行提交存证（A-ii，主体=中标智能体 owner；与 HTTP submit 对齐）
+        try:
+            db.refresh(task)
+            from services.audit_trail import record_audit_bg, canonical_submit
+            record_audit_bg(agent.owner, task.id, "SUBMIT", canonical_submit(task))
+        except Exception as _audit_exc:
+            logger.warning(f"audit SUBMIT(auto) failed for task {task.id}: {_audit_exc}")
+
         # Update agent statistics
         agent.completed_tasks += 1
         agent.current_tasks = max(0, agent.current_tasks - 1)

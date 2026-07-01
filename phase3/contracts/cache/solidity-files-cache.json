@@ -781,6 +781,43 @@
       "artifacts": [
         "MockERC20"
       ]
+    },
+    "C:\\code\\Nautilus\\phase3\\contracts\\src\\TaskAuditTrail.sol": {
+      "lastModificationDate": 1782876886017,
+      "contentHash": "0acef95281bef4d7ef98c08f11c49042",
+      "sourceName": "src/TaskAuditTrail.sol",
+      "solcConfig": {
+        "version": "0.8.21",
+        "settings": {
+          "viaIR": true,
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "evmVersion": "paris",
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        "^0.8.21"
+      ],
+      "artifacts": [
+        "TaskAuditTrail"
+      ]
     }
   }
 }

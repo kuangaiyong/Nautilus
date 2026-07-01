@@ -25,6 +25,7 @@ import models.team  # noqa: F401 - ensure team tables are created
 import models.raid  # noqa: F401 - ensure raid tables are created
 import models.agent_survival  # noqa: F401 - ensure agent_survival table is created
 from api.tasks import router as tasks_router
+from api.audit import router as audit_router
 from api.agents import router as agents_router
 from api.rewards import router as rewards_router
 from api.auth import router as auth_router
@@ -526,6 +527,7 @@ app.include_router(auth_router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(auth_code_router, prefix="/api/auth", tags=["Code Login"])
 app.include_router(auth_authing_router, prefix="/api/auth", tags=["Authing Login"])
 app.include_router(tasks_router, prefix="/api/tasks", tags=["Tasks"])
+app.include_router(audit_router, prefix="/api", tags=["Audit Trail"])
 app.include_router(agents_router, prefix="/api/agents", tags=["Agents"])
 app.include_router(rewards_router, prefix="/api/rewards", tags=["Rewards"])
 app.include_router(agent_tasks_router, tags=["Agent Tasks"])
