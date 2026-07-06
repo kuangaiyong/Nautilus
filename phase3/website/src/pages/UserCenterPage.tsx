@@ -9,7 +9,7 @@ interface UserStats {
   failed_tasks: number
   total_earnings: number
   total_spent: number
-  reputation: number
+  reputation: number | null
 }
 
 interface Task {
@@ -17,7 +17,7 @@ interface Task {
   description: string
   status: string
   task_type: string
-  reward: number
+  reward: string
   publisher?: string
   agent?: string
   created_at: string
@@ -32,7 +32,7 @@ export default function UserCenterPage() {
     failed_tasks: 0,
     total_earnings: 0,
     total_spent: 0,
-    reputation: 100
+    reputation: null
   })
   const [recentTasks, setRecentTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
@@ -46,25 +46,23 @@ export default function UserCenterPage() {
     const load = async () => {
       setLoading(true)
       try {
-        const res = await fetch('/api/tasks', {
+        const res = await fetch('/api/auth/me/stats', {
           headers: {
             ...(token ? { 'Authorization': `Bearer ${token}` } : {})
           }
         })
         if (!res.ok) throw new Error('Failed')
-        const data = await res.json()
-        const tasks: Task[] = Array.isArray(data) ? data : (data.data || [])
-        setRecentTasks(tasks.slice(0, 5))
-        const completed = tasks.filter(t => t.status === 'COMPLETED').length
-        const failed = tasks.filter(t => t.status === 'FAILED').length
+        const json = await res.json()
+        const d = json.data || json
         setStats({
-          total_tasks: tasks.length,
-          completed_tasks: completed,
-          failed_tasks: failed,
-          total_earnings: 0,
-          total_spent: 0,
-          reputation: 100 + completed * 10 - failed * 5
+          total_tasks: d.total_tasks ?? 0,
+          completed_tasks: d.completed_tasks ?? 0,
+          failed_tasks: d.failed_tasks ?? 0,
+          total_earnings: Number(d.total_earnings ?? 0),
+          total_spent: Number(d.total_spent ?? 0),
+          reputation: d.reputation ?? null
         })
+        setRecentTasks(Array.isArray(d.recent_tasks) ? d.recent_tasks : [])
       } catch (e) {
         console.error('加载失败:', e)
       } finally {
@@ -121,7 +119,7 @@ export default function UserCenterPage() {
     COMPLETED: '已完成', FAILED: '失败'
   } as Record<string, string>)[s] || s)
 
-  const formatHua = (wei: number) => (wei / 1e18).toFixed(4)
+  const formatHua = (wei: string | number) => (Number(wei) / 1e18).toFixed(4)
 
   if (!user) return null
 
@@ -211,12 +209,12 @@ export default function UserCenterPage() {
                     <span className="text-sm font-medium flex items-center">
                       <Award className="w-4 h-4 mr-2" />信誉
                     </span>
-                    <span className="text-lg font-bold text-blue-600">{stats.reputation}</span>
+                    <span className="text-lg font-bold text-blue-600">{stats.reputation ?? '—'}</span>
                   </div>
                   <div className="mt-2 bg-gray-200 rounded-full h-2">
                     <div
                       className="bg-gradient-to-r from-blue-500 to-purple-500 h-2 rounded-full"
-                      style={{ width: `${Math.min(stats.reputation, 100)}%` }}
+                      style={{ width: `${Math.min(stats.reputation ?? 0, 100)}%` }}
                     ></div>
                   </div>
                 </div>

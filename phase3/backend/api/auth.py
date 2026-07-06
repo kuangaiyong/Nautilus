@@ -18,7 +18,7 @@ import logging
 logger = logging.getLogger(__name__)
 from utils.redis_client import get_redis
 
-from models.database import User
+from models.database import User, Task, Agent
 from utils.database import get_db
 from utils.auth import (
     hash_password,
@@ -402,6 +402,75 @@ async def read_current_user(request: Request, current_user: User = Depends(get_c
                 "created_at": current_user.created_at,
             }
         }
+    }
+
+
+@router.get("/me/stats")
+@limiter.limit("100/minute")
+async def read_current_user_stats(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    获取「当前登录用户本人」的真实聚合统计（供个人中心展示）。
+
+    口径全部基于本人真实数据，且在 Python 侧求和以规避对 WeiInt/TEXT 列
+    （Task.reward）做 SQL 求和的精度问题：
+    - 任务统计：以本人钱包地址为 publisher 的任务
+    - 累计支出：本人已 COMPLETED 的发布任务奖励之和（华币 wei）
+    - 累计收入 / 信誉：本人名下 Agent（owner==钱包）的收入之和 / 平均声誉
+      （无 Agent 时收入为 0、信誉为 null）
+    - recent_tasks：本人发布的最近 5 个任务
+    """
+    wallet = current_user.wallet_address or ""
+
+    my_tasks = (
+        db.query(Task)
+        .filter(Task.publisher == wallet)
+        .order_by(Task.created_at.desc())
+        .all()
+        if wallet else []
+    )
+
+    def _status(t):
+        s = t.status.value if hasattr(t.status, "value") else t.status
+        return str(s).upper()
+
+    completed = [t for t in my_tasks if _status(t).endswith("COMPLETED")]
+    failed = [t for t in my_tasks if _status(t).endswith("FAILED")]
+
+    # Task.reward 是 WeiInt（TEXT 存储），只能在 Python 侧求和
+    total_spent = sum(int(t.reward or 0) for t in completed)
+
+    my_agents = db.query(Agent).filter(Agent.owner == wallet).all() if wallet else []
+    total_earnings = sum(int(a.total_earnings or 0) for a in my_agents)
+    reputation = (
+        round(sum(float(a.reputation_score or 0) for a in my_agents) / len(my_agents), 1)
+        if my_agents else None
+    )
+
+    def _serialize(t):
+        return {
+            "id": t.id,
+            "description": t.description,
+            "status": _status(t),
+            "task_type": (t.task_type.value if hasattr(t.task_type, "value") else str(t.task_type)),
+            "reward": str(int(t.reward or 0)),
+            "created_at": t.created_at.isoformat() if t.created_at else None,
+        }
+
+    return {
+        "success": True,
+        "data": {
+            "total_tasks": len(my_tasks),
+            "completed_tasks": len(completed),
+            "failed_tasks": len(failed),
+            "total_spent": str(total_spent),
+            "total_earnings": str(total_earnings),
+            "reputation": reputation,
+            "recent_tasks": [_serialize(t) for t in my_tasks[:5]],
+        },
     }
 
 

@@ -224,6 +224,82 @@ class TestTasksE2E:
         data = response.json()
         assert all(task["task_type"] == "CODE_DEVELOPMENT" for task in data)
 
+    def test_list_tasks_pagination(self, client, auth_token):
+        """回归测试：skip 分页必须返回不同页。
+
+        复现 bug：list_tasks 端点声明了 skip 参数，但 get_tasks_cached 从未
+        应用 offset，导致任何 skip 都返回同一批「前 limit 条」，前端翻页失效。
+        修复前 page1 与 page2 完全相同，下面的 isdisjoint 断言必然失败。
+        """
+        for i in range(7):
+            resp = client.post(
+                "/api/tasks",
+                json={
+                    "description": f"Pagination task {i}",
+                    "reward": 1000 + i,
+                    "task_type": "CODE_DEVELOPMENT",
+                    "timeout": 3600
+                },
+                headers={"Authorization": f"Bearer {auth_token}"}
+            )
+            assert resp.status_code == 201
+
+        page1 = client.get("/api/tasks?skip=0&limit=3")
+        page2 = client.get("/api/tasks?skip=3&limit=3")
+        assert page1.status_code == 200
+        assert page2.status_code == 200
+        ids1 = [t["id"] for t in page1.json()]
+        ids2 = [t["id"] for t in page2.json()]
+
+        assert len(ids1) <= 3
+        assert len(ids2) <= 3
+        # 两页不能有重叠记录（bug 修复前二者完全相同，此断言必失败）
+        assert set(ids1).isdisjoint(set(ids2)), \
+            f"翻页返回重叠记录，分页未生效: page1={ids1} page2={ids2}"
+
+    def test_me_stats_only_counts_own_data(self, client, auth_token):
+        """回归：/api/auth/me/stats 只统计当前用户本人的任务，且收入/信誉来自
+        本人 Agent（无 Agent 时为 0 / None）。
+
+        复现 bug：个人中心此前 fetch 无过滤的 /api/tasks（=全平台）当作个人统计，
+        累计收入/支出硬编码为 0、信誉用 completed/failed 在前端乱算。
+        """
+        # auth_token fixture 已注册 testuser；直接按其钱包地址造数据（避免依赖建单细节）
+        db = TestingSessionLocal()
+        try:
+            me = db.query(User).filter(User.username == "testuser").first()
+            wallet = me.wallet_address
+            for i in range(2):
+                db.add(Task(
+                    task_id=f"mine_{i}", publisher=wallet,
+                    description=f"my task {i}", reward=1000,
+                    task_type=TaskType.CODE_DEVELOPMENT,
+                    status=TaskStatus.OPEN, timeout=3600,
+                ))
+            # 别人发布的已完成任务，绝不能被算进本人统计
+            db.add(Task(
+                task_id="other_1", publisher="0x0000000000000000000000000000000000000abc",
+                description="not mine", reward=999,
+                task_type=TaskType.CODE_DEVELOPMENT,
+                status=TaskStatus.COMPLETED, timeout=3600,
+            ))
+            db.commit()
+        finally:
+            db.close()
+
+        resp = client.get(
+            "/api/auth/me/stats",
+            headers={"Authorization": f"Bearer {auth_token}"},
+        )
+        assert resp.status_code == 200
+        data = resp.json()["data"]
+        assert data["total_tasks"] == 2                  # 别人那条不计入
+        assert data["completed_tasks"] == 0              # 别人的 COMPLETED 不算本人
+        assert len(data["recent_tasks"]) == 2
+        assert data["total_earnings"] == "0"             # 无 Agent
+        assert data["reputation"] is None                # 无 Agent
+        assert all(t["description"].startswith("my task") for t in data["recent_tasks"])
+
     def test_get_task_by_id(self, client, auth_token):
         """测试获取单个任务"""
         # 创建任务

@@ -299,6 +299,7 @@ async def list_tasks(
     # Use cached task list query
     result = await get_tasks_cached(status=status.value if status else None,
                                     task_type=task_type.value if task_type else None,
+                                    skip=skip,
                                     limit=limit, db=db)
     return result["tasks"]
 
