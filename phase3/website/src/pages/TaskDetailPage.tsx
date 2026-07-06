@@ -252,7 +252,7 @@ export default function TaskDetailPage() {
           )}
           {canComplete && (
             <button onClick={handleComplete} disabled={submitting} className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50">
-              {submitting ? '结算中…' : '评审通过并发放奖励'}
+              {submitting ? '评审结算中…' : '立即评审并结算'}
             </button>
           )}
           {canDispute && (

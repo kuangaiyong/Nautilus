@@ -95,8 +95,8 @@ CRON_JOBS = [
     {
         "id": "se_marketplace",
         "trigger": IntervalTrigger(minutes=1),
-        "description": "软件工程任务市场：自主智能体加权竞价 + 竞价窗到点择优中标派单",
-        "budget_seconds": 20,
+        "description": "软件工程任务市场：自主竞价+择优派单+自主交付+3专家自动评审结算",
+        "budget_seconds": 90,
     },
 ]
 
@@ -171,13 +171,22 @@ def _make_se_marketplace_fn(db_factory):
     """软件工程任务市场：自主智能体加权竞价 + 竞价窗到点择优中标派单。"""
     async def _fn():
         try:
-            from services.se_pouw_flow import auto_bid_open_se_tasks, award_due_se_tasks
+            from services.se_pouw_flow import (
+                auto_bid_open_se_tasks, award_due_se_tasks, auto_deliver_accepted_se_tasks,
+                auto_review_and_settle_submitted_se_tasks,
+            )
             db = db_factory()
             try:
                 auto_bid_open_se_tasks(db)
                 awarded = award_due_se_tasks(db)
                 if awarded:
                     logger.info("se_marketplace: awarded %d SE task(s)", awarded)
+                delivered = auto_deliver_accepted_se_tasks(db)
+                if delivered:
+                    logger.info("se_marketplace: delivered %d SE task(s)", delivered)
+                settled = await auto_review_and_settle_submitted_se_tasks(db)
+                if settled:
+                    logger.info("se_marketplace: settled %d SE task(s)", settled)
             finally:
                 db.close()
         except Exception as e:

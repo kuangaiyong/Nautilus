@@ -116,6 +116,99 @@ def award_due_se_tasks(db: Session) -> int:
 
 
 # ---------------------------------------------------------------------------
+# P1.5 自主交付：中标智能体对 ACCEPTED 的 SE 任务生成交付物并提交(→SUBMITTED)
+# ---------------------------------------------------------------------------
+
+# 任务类型 → (专家角色, 期望交付物)，用于自主交付的 LLM 提示
+_DELIVER_ROLE = {
+    "REQUIREMENT_ANALYSIS": ("资深需求分析师(BA)", "结构化的需求分析文档（含背景、用户故事、功能/非功能需求、验收标准）"),
+    "ARCHITECTURE_DESIGN": ("资深系统架构师", "技术方案/架构设计（含总体架构、关键组件、数据流、技术选型与权衡）"),
+    "CODE_DEVELOPMENT": ("资深软件工程师", "可运行的实现代码（含必要注释与关键说明）"),
+    "CODE_REVIEW": ("资深代码评审专家", "代码评审报告（含问题清单、严重级别与改进建议）"),
+    "TEST_CASE_DESIGN": ("资深测试工程师(QA)", "覆盖正常/边界/异常路径的测试用例集（含前置条件、步骤、预期结果）"),
+    "TEST_AUTOMATION": ("资深自动化测试工程师", "可执行的自动化测试脚本（含用例说明）"),
+    "DEPLOYMENT_OPS": ("资深运维/DevOps 工程师", "部署运维方案（含步骤、配置、回滚与监控要点）"),
+    "DOCUMENTATION": ("资深技术文档工程师", "结构清晰、可读性强的技术文档"),
+}
+
+_DELIVER_SYSTEM = (
+    "你是{role}。请针对给定的软件工程任务，直接产出高质量的{artifact}。"
+    "只输出交付物本身，不要寒暄、不要复述任务。"
+)
+
+
+def _generate_deliverable(task_type, description, input_data, expected_output) -> Optional[str]:
+    """用统一 LLM 网关为 SE 任务生成交付物。
+
+    对模型间歇性空响应做最多 3 次重试；LLM 未配置或始终拿不到非空输出时返回 None
+    （宁可保持 ACCEPTED 下轮重试，也绝不写入空/垃圾交付物）。
+    """
+    from services.llm_gateway import chat, is_configured
+
+    role, artifact = _DELIVER_ROLE.get(se_pouw._norm(task_type), ("资深软件工程师", "高质量交付物"))
+    system = _DELIVER_SYSTEM.format(role=role, artifact=artifact)
+    prompt = (
+        f"任务类型: {se_pouw._norm(task_type)}\n"
+        f"任务要求:\n{(description or '')[:2000]}\n\n"
+        f"补充输入:\n{(input_data or '')[:1000]}\n\n"
+        f"期望产出:\n{(expected_output or '')[:1000]}\n\n"
+        f"请交付：{artifact}。"
+    )
+    for _ in range(3):
+        try:
+            if not is_configured():
+                return None
+            raw = chat(prompt, system=system, max_tokens=2048, temperature=0.3)
+            if raw and raw.strip():
+                return raw.strip()
+        except Exception as exc:
+            logger.warning("SE 自主交付 LLM 生成失败(type=%s): %s", se_pouw._norm(task_type), exc)
+    return None
+
+
+def auto_deliver_accepted_se_tasks(db: Session) -> int:
+    """中标的自主智能体对其 ACCEPTED 且尚未交付的 SE 任务生成交付物并提交(→SUBMITTED)。
+
+    这是 P1 竞价中标(→ACCEPTED)与 P3 评审(complete 时触发)之间此前缺失的一环：SE 任务
+    不进自动执行器队列，需由中标智能体自行交付，否则会永久卡在 ACCEPTED。仅处理指派给
+    autonomy_enabled 智能体、result 仍为空的任务；手动抢单/非自主智能体的任务留给其自行
+    提交；LLM 不可用时跳过。状态流转与字段与 POST /{id}/submit 端点保持一致。返回提交数。
+    """
+    from models.database import Agent, Task, TaskStatus
+
+    accepted_se = [t for t in db.query(Task).filter(Task.status == TaskStatus.ACCEPTED).all()
+                   if se_pouw.is_se_task(t.task_type) and not (t.result or "").strip()]
+    if not accepted_se:
+        return 0
+
+    submitted = 0
+    for task in accepted_se:
+        agent = db.query(Agent).filter(Agent.owner == task.agent).first() if task.agent else None
+        if not agent or not agent.autonomy_enabled:
+            continue  # 非自主/手动抢单的任务交由其自行提交
+        deliverable = _generate_deliverable(task.task_type, task.description,
+                                            task.input_data, task.expected_output)
+        if not deliverable:
+            continue  # LLM 不可用，保持 ACCEPTED 下轮重试
+
+        # 与 POST /{id}/submit 端点一致的状态流转
+        task.result = deliverable
+        task.status = TaskStatus.SUBMITTED
+        task.submitted_at = datetime.now(timezone.utc)
+        db.commit()
+        db.refresh(task)
+        try:
+            from services.audit_trail import record_audit_bg, canonical_submit
+            record_audit_bg(task.agent, task.id, "SUBMIT", canonical_submit(task))
+        except Exception as _audit_exc:
+            logger.warning("audit SUBMIT failed task=%s: %s", task.id, _audit_exc)
+        submitted += 1
+        logger.info("auto_deliver: task=%s agent=%s SUBMITTED (%d chars)",
+                    task.id, agent.agent_id, len(deliverable))
+    return submitted
+
+
+# ---------------------------------------------------------------------------
 # P3 三专家评审（LLM 自动评分）
 # ---------------------------------------------------------------------------
 
@@ -298,3 +391,56 @@ async def mint_nau_for_task(db: Session, task) -> Optional[str]:
         return None
     tt = task.task_type.value if hasattr(task.task_type, "value") else str(task.task_type)
     return await NautilusTokenService.mint_task_reward(agent.owner, tt)
+
+
+# ---------------------------------------------------------------------------
+# P4 自动验收结算：SUBMITTED → 3 专家评审 → 达标自动华币结算+铸 NAU → COMPLETED
+# ---------------------------------------------------------------------------
+
+async def auto_review_and_settle_submitted_se_tasks(db: Session, limit: int = 2) -> int:
+    """SUBMITTED 的 SE 任务自动跑 3 专家评审并达标结算(→COMPLETED)，补上此前缺失的
+    SUBMITTED→COMPLETED 自动驱动（对称于 auto_deliver 的 ACCEPTED→SUBMITTED）。
+
+    以发布者身份复用 api.tasks.complete_task 的完整「3 专家评审 + 华币结算 + 铸 NAU +
+    生存记分」逻辑（不重复实现，与发布者手动点「完成」走同一条已验证代码路径），逐任务
+    隔离异常：
+      - 评审有效数不足(503) / 发布者华币不足(400) → 跳过，任务留 SUBMITTED 下轮重试
+      - 评审均分未达阈值 → complete_task 内部置 FAILED（正常返回、不抛、不付款）
+      - 达标 → 华币结算 + 铸 NAU → COMPLETED
+    评审是 3×LLM 的重操作，每轮最多处理 limit 个，避免单轮 cron 超预算。返回成功结算数。
+    """
+    from fastapi import HTTPException
+    from models.database import Task, TaskStatus, User
+
+    submitted_se = [t for t in db.query(Task).filter(Task.status == TaskStatus.SUBMITTED).all()
+                    if se_pouw.is_se_task(t.task_type)][:limit]
+    if not submitted_se:
+        return 0
+
+    from api.tasks import complete_task  # 延迟 import，避免与 api 层的循环依赖
+
+    settled = 0
+    for task in submitted_se:
+        publisher = (db.query(User).filter(User.wallet_address == task.publisher).first()
+                     if task.publisher else None)
+        if not publisher:
+            logger.warning("auto_settle: task=%s 发布者钱包无对应用户，跳过", task.id)
+            continue
+        try:
+            await complete_task(task_id=task.id, current_user=publisher, db=db)
+        except HTTPException as he:
+            # 503 评审不全 / 400 华币不足：可恢复，回滚半程事务、保持 SUBMITTED 下轮重试
+            db.rollback()
+            logger.info("auto_settle: task=%s 暂缓(HTTP %s): %s", task.id, he.status_code, he.detail)
+            continue
+        except Exception as exc:
+            db.rollback()
+            logger.warning("auto_settle: task=%s 结算异常: %s", task.id, exc)
+            continue
+        db.refresh(task)
+        if task.status == TaskStatus.COMPLETED:
+            settled += 1
+            logger.info("auto_settle: task=%s COMPLETED（华币结算 + 铸 NAU）", task.id)
+        elif task.status == TaskStatus.FAILED:
+            logger.info("auto_settle: task=%s 评审未通过 → FAILED（不付款）", task.id)
+    return settled
