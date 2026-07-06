@@ -31,20 +31,20 @@ class WeiInt(TypeDecorator):
 
 
 class TaskType(enum.Enum):
-    """Task type enumeration."""
-    CODE = "CODE"
-    DATA = "DATA"
-    COMPUTE = "COMPUTE"
-    RESEARCH = "RESEARCH"
-    DESIGN = "DESIGN"
-    WRITING = "WRITING"
-    OTHER = "OTHER"
-    # 软件工程任务类型（PoUW 市场：自主竞价 + 3 专家评审 + 完成铸 NAU）
+    """软件工程任务类型（全生命周期 8 类）。
+
+    平台所有任务均走 SE PoUW 流程：自主竞价 + 3 专家评审 + 完成铸 NAU。
+    旧通用类型（CODE/DATA/COMPUTE/RESEARCH/DESIGN/WRITING/OTHER）已下线，
+    存量数据由 migrate_se_only_task_types.py 映射到 SE 类型。
+    """
     REQUIREMENT_ANALYSIS = "REQUIREMENT_ANALYSIS"   # 需求分析
     ARCHITECTURE_DESIGN = "ARCHITECTURE_DESIGN"     # 技术方案/架构设计
+    CODE_DEVELOPMENT = "CODE_DEVELOPMENT"           # 代码开发
+    CODE_REVIEW = "CODE_REVIEW"                     # 代码评审
     TEST_CASE_DESIGN = "TEST_CASE_DESIGN"           # 测试用例设计
     TEST_AUTOMATION = "TEST_AUTOMATION"             # 自动化测试脚本生成
-    CODE_DEVELOPMENT = "CODE_DEVELOPMENT"           # 代码开发
+    DEPLOYMENT_OPS = "DEPLOYMENT_OPS"               # 部署运维
+    DOCUMENTATION = "DOCUMENTATION"                 # 技术文档
 
 
 class TaskStatus(enum.Enum):

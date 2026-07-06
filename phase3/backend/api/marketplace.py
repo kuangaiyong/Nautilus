@@ -133,80 +133,24 @@ class RateTaskRequest(BaseModel):
     comment: Optional[str] = Field("", max_length=2000, description="Optional rating comment")
 
 
-class SubmitHumanTaskRequest(BaseModel):
-    title: str = Field(..., min_length=5, max_length=200)
-    description: str = Field(..., min_length=10, max_length=5000)
-    task_type: str = Field("general_computation")
-    budget_nau: Optional[float] = Field(None, ge=0)
-
-
 # ---------------------------------------------------------------------------
 # Task bidding marketplace — endpoints (task_router, prefix=/api/marketplace)
 # ---------------------------------------------------------------------------
 
 
 @task_router.post("/tasks/submit")
-async def tm_submit_human_task(
-    body: SubmitHumanTaskRequest,
-    db: Session = Depends(get_db),
-):
-    """Submit a human-posted task for AI agent execution.
-
-    Creates an academic task open for bidding. The cheapest/fastest agent
-    will be auto-assigned if no manual bid selection is made.
-    """
-    import uuid
-    from datetime import datetime
-    from models.database import AcademicTask as AcademicTaskModel
-
-    task_id = f"human_{uuid.uuid4().hex[:12]}"
-    now = datetime.utcnow()
-
-    valid_types = {
-        "research_synthesis", "data_analysis", "physics_simulation",
-        "ml_training", "statistical_analysis", "general_computation",
-    }
-    task_type = body.task_type if body.task_type in valid_types else "general_computation"
-
-    row = AcademicTaskModel(
-        task_id=task_id,
-        title=body.title,
-        description=body.description,
-        task_type=task_type,
-        status="pending",
-        created_at=now,
-        updated_at=now,
-    )
-    db.add(row)
-    db.commit()
-    db.refresh(row)
-
-    # Assign to running A/B experiment if any
-    try:
-        from services.sandbox import assign_task_to_experiment
-        assign_task_to_experiment(db, task_id)
-    except Exception:
-        pass
-
-    # Dispatch async execution
-    import asyncio
-    try:
-        from api.academic_tasks import _dispatch_academic_task
-        asyncio.create_task(_dispatch_academic_task(task_id))
-    except Exception:
-        pass
-
-    return {
-        "success": True,
-        "data": {
-            "task_id": task_id,
-            "title": row.title,
-            "task_type": task_type,
-            "status": row.status,
-            "created_at": now.isoformat(),
+async def tm_submit_human_task():
+    """[已下线] 人机协作任务创建入口已收敛：任务发布唯一入口为 POST /api/tasks。"""
+    from fastapi import HTTPException
+    raise HTTPException(
+        status_code=410,
+        detail={
+            "error": {
+                "code": "ENDPOINT_RETIRED",
+                "message": "任务发布唯一入口为 POST /api/tasks（软件工程任务市场：自主竞价 + 3 专家评审 + 华币/NAU 奖励）",
+            }
         },
-        "error": None,
-    }
+    )
 
 
 @task_router.get("/tasks/{task_id}")

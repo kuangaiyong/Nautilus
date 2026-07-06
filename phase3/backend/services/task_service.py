@@ -13,12 +13,13 @@ logger = logging.getLogger(__name__)
 
 
 @cached(ttl=120, key_prefix="tasks")
-async def get_tasks_cached(status: str = None, limit: int = 20, db: Session = None) -> dict:
+async def get_tasks_cached(status: str = None, task_type: str = None, limit: int = 20, db: Session = None) -> dict:
     """
     Get tasks list with caching (2 minutes).
 
     Args:
         status: Filter by task status (optional)
+        task_type: Filter by task type (optional)
         limit: Maximum number of tasks to return
         db: Database session
 
@@ -29,6 +30,9 @@ async def get_tasks_cached(status: str = None, limit: int = 20, db: Session = No
 
     if status:
         query = query.filter(Task.status == status)
+
+    if task_type:
+        query = query.filter(Task.task_type == task_type)
 
     tasks = query.order_by(Task.created_at.desc()).limit(limit).all()
 

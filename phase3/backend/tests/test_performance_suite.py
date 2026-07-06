@@ -78,7 +78,7 @@ def setup_database():
             publisher=user.wallet_address,
             description=f"Performance test task {i}",
             reward=1000000000000000000,  # 1 ETH
-            task_type=TaskType.CODE,
+            task_type=TaskType.CODE_DEVELOPMENT,
             status=TaskStatus.OPEN if i % 3 == 0 else TaskStatus.COMPLETED,
             timeout=3600
         )
@@ -272,13 +272,13 @@ class TestDatabasePerformance:
 
         # Test with status filter
         start = time.time()
-        response = client.get("/api/tasks?status=Open")
+        response = client.get("/api/tasks?status=OPEN")
         status_filter_time = time.time() - start
         assert response.status_code == 200
 
         # Test with type filter
         start = time.time()
-        response = client.get("/api/tasks?task_type=CODE")
+        response = client.get("/api/tasks?task_type=CODE_DEVELOPMENT")
         type_filter_time = time.time() - start
         assert response.status_code == 200
 

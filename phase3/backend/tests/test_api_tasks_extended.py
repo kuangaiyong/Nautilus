@@ -125,7 +125,7 @@ class TestCreateTask:
             json={
                 "title": "Test Task",
                 "description": "Test Description",
-                "task_type": "CODE",
+                "task_type": "CODE_DEVELOPMENT",
                 "reward_amount": 100.0,
                 "deadline": (datetime.now(timezone.utc) + timedelta(days=7)).isoformat()
             }
@@ -142,7 +142,7 @@ class TestCreateTask:
             headers={"Authorization": f"Bearer {auth_token}"},
             json={
                 "description": "Test Description",
-                "task_type": "CODE",
+                "task_type": "CODE_DEVELOPMENT",
                 "reward_amount": 100.0
             }
         )
@@ -156,7 +156,7 @@ class TestCreateTask:
             json={
                 "title": "",
                 "description": "Test Description",
-                "task_type": "CODE",
+                "task_type": "CODE_DEVELOPMENT",
                 "reward_amount": 100.0
             }
         )
@@ -170,7 +170,7 @@ class TestCreateTask:
             json={
                 "title": "A" * 201,
                 "description": "Test Description",
-                "task_type": "CODE",
+                "task_type": "CODE_DEVELOPMENT",
                 "reward_amount": 100.0
             }
         )
@@ -184,7 +184,7 @@ class TestCreateTask:
             json={
                 "title": "Test Task",
                 "description": "Test Description",
-                "task_type": "CODE",
+                "task_type": "CODE_DEVELOPMENT",
                 "reward_amount": -10.0
             }
         )
@@ -198,7 +198,7 @@ class TestCreateTask:
             json={
                 "title": "Test Task",
                 "description": "Test Description",
-                "task_type": "CODE",
+                "task_type": "CODE_DEVELOPMENT",
                 "reward_amount": 0.0
             }
         )
@@ -226,7 +226,7 @@ class TestCreateTask:
             json={
                 "title": "Test Task",
                 "description": "Test Description",
-                "task_type": "CODE",
+                "task_type": "CODE_DEVELOPMENT",
                 "reward_amount": 100.0,
                 "deadline": (datetime.now(timezone.utc) - timedelta(days=1)).isoformat()
             }
@@ -240,7 +240,7 @@ class TestCreateTask:
             json={
                 "title": "Test Task",
                 "description": "Test Description",
-                "task_type": "CODE",
+                "task_type": "CODE_DEVELOPMENT",
                 "reward_amount": 100.0
             }
         )
@@ -266,7 +266,7 @@ class TestListTasks:
                 json={
                     "title": f"Task {i}",
                     "description": f"Description {i}",
-                    "task_type": "CODE",
+                    "task_type": "CODE_DEVELOPMENT",
                     "reward_amount": 100.0 * (i + 1)
                 }
             )
@@ -286,7 +286,7 @@ class TestListTasks:
                 json={
                     "title": f"Task {i}",
                     "description": f"Description {i}",
-                    "task_type": "CODE",
+                    "task_type": "CODE_DEVELOPMENT",
                     "reward_amount": 100.0
                 }
             )
@@ -311,7 +311,7 @@ class TestListTasks:
                     task = Task(
                         title=f"{status} Task {i}",
                         description="Test",
-                        task_type="CODE",
+                        task_type="CODE_DEVELOPMENT",
                         reward_amount=100.0,
                         creator_id=test_user.id,
                         status=status
@@ -364,7 +364,7 @@ class TestListTasks:
                 task = Task(
                     title=f"Task {amount}",
                     description="Test",
-                    task_type="CODE",
+                    task_type="CODE_DEVELOPMENT",
                     reward_amount=amount,
                     creator_id=test_user.id,
                     status="Open"
@@ -390,7 +390,7 @@ class TestGetTask:
             json={
                 "title": "Test Task",
                 "description": "Test Description",
-                "task_type": "CODE",
+                "task_type": "CODE_DEVELOPMENT",
                 "reward_amount": 100.0
             }
         )
@@ -425,7 +425,7 @@ class TestAcceptTask:
             task = Task(
                 title="Test Task",
                 description="Test",
-                task_type="CODE",
+                task_type="CODE_DEVELOPMENT",
                 reward_amount=100.0,
                 creator_id=test_user.id,
                 status="Open"
@@ -452,7 +452,7 @@ class TestAcceptTask:
             task = Task(
                 title="Test Task",
                 description="Test",
-                task_type="CODE",
+                task_type="CODE_DEVELOPMENT",
                 reward_amount=100.0,
                 creator_id=test_user.id,
                 status="InProgress",
@@ -493,7 +493,7 @@ class TestSubmitTask:
             task = Task(
                 title="Test Task",
                 description="Test",
-                task_type="CODE",
+                task_type="CODE_DEVELOPMENT",
                 reward_amount=100.0,
                 creator_id=test_user.id,
                 status="InProgress",
@@ -524,7 +524,7 @@ class TestSubmitTask:
             task = Task(
                 title="Test Task",
                 description="Test",
-                task_type="CODE",
+                task_type="CODE_DEVELOPMENT",
                 reward_amount=100.0,
                 creator_id=test_user.id,
                 status="Open"
@@ -564,7 +564,7 @@ class TestSubmitTask:
             task = Task(
                 title="Test Task",
                 description="Test",
-                task_type="CODE",
+                task_type="CODE_DEVELOPMENT",
                 reward_amount=100.0,
                 creator_id=test_user.id,
                 status="InProgress",
@@ -599,7 +599,7 @@ class TestCompleteTask:
             task = Task(
                 title="Test Task",
                 description="Test",
-                task_type="CODE",
+                task_type="CODE_DEVELOPMENT",
                 reward_amount=100.0,
                 creator_id=test_user.id,
                 status="Submitted",
@@ -630,7 +630,7 @@ class TestCancelTask:
             task = Task(
                 title="Test Task",
                 description="Test",
-                task_type="CODE",
+                task_type="CODE_DEVELOPMENT",
                 reward_amount=100.0,
                 creator_id=test_user.id,
                 status="Open"
@@ -666,7 +666,7 @@ class TestCancelTask:
             task = Task(
                 title="Test Task",
                 description="Test",
-                task_type="CODE",
+                task_type="CODE_DEVELOPMENT",
                 reward_amount=100.0,
                 creator_id=other_user.id,
                 status="Open"
@@ -696,7 +696,7 @@ class TestTaskEdgeCases:
             json={
                 "title": "Test Task",
                 "description": "A" * 10000,
-                "task_type": "CODE",
+                "task_type": "CODE_DEVELOPMENT",
                 "reward_amount": 100.0
             }
         )
@@ -710,7 +710,7 @@ class TestTaskEdgeCases:
             json={
                 "title": "Test Task with 特殊字符 and émojis 🚀",
                 "description": "Description with <html> & special chars",
-                "task_type": "CODE",
+                "task_type": "CODE_DEVELOPMENT",
                 "reward_amount": 100.0
             }
         )
@@ -724,7 +724,7 @@ class TestTaskEdgeCases:
             json={
                 "title": "High Reward Task",
                 "description": "Test",
-                "task_type": "CODE",
+                "task_type": "CODE_DEVELOPMENT",
                 "reward_amount": 1000000.0
             }
         )

@@ -12,7 +12,6 @@ from datetime import datetime, timezone
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 import asyncio
-import uuid
 import json
 import logging
 import os
@@ -56,43 +55,6 @@ class AcademicTaskStatus(str, Enum):
     COMPLETED = "completed"
     FAILED = "failed"
     CANCELLED = "cancelled"
-
-
-class CreateAcademicTaskRequest(BaseModel):
-    """Request to submit a new academic task."""
-    title: str = Field(..., min_length=1, max_length=200)
-    description: str = Field(..., min_length=1, max_length=5000)
-    task_type: AcademicTaskType
-    input_data: Optional[str] = Field(
-        None, max_length=100000,
-        description="JSON string or CSV data for the task"
-    )
-    parameters: Optional[Dict[str, Any]] = Field(
-        None,
-        description="Task-specific parameters (e.g. model type, iterations)"
-    )
-    expected_output: Optional[str] = Field(
-        None, max_length=5000,
-        description="Description of expected output format"
-    )
-
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "title": "Damped harmonic oscillator simulation",
-                "description": "Simulate a damped harmonic oscillator with m=1kg, k=10N/m, b=0.5Ns/m. Plot position vs time for 10 seconds.",
-                "task_type": "ode_simulation",
-                "input_data": None,
-                "parameters": {
-                    "mass": 1.0,
-                    "spring_constant": 10.0,
-                    "damping_coefficient": 0.5,
-                    "duration": 10.0,
-                    "dt": 0.01
-                },
-                "expected_output": "Time series plot of position and velocity"
-            }
-        }
 
 
 class AcademicTaskResult(BaseModel):
@@ -177,185 +139,19 @@ def _model_to_response(row: AcademicTaskModel) -> AcademicTaskResponse:
     )
 
 
-@router.post(
-    "/submit",
-    response_model=AcademicTaskResponse,
-    status_code=status.HTTP_201_CREATED,
-)
+@router.post("/submit")
 @limiter.limit("10/minute")
-async def submit_academic_task(
-    request: Request,
-    task_data: CreateAcademicTaskRequest,
-    db: Session = Depends(get_db),
-):
-    """
-    Submit a new academic task for execution.
-
-    Accepts physics simulations, curve fitting, ML experiments, and other
-    scientific computations. The task is queued for execution by the
-    CodeExecutor service.
-
-    **Rate Limit**: 10 requests per minute
-
-    **Request Body**:
-    - `title`: Short title (max 200 chars)
-    - `description`: Detailed description of the computation (max 5000 chars)
-    - `task_type`: One of the supported academic task types
-    - `input_data`: Optional JSON/CSV data input
-    - `parameters`: Optional task-specific parameters dict
-    - `expected_output`: Optional description of expected output
-
-    **Returns**: Created task with `task_id` for polling status.
-    """
-    task_id = f"acad_{uuid.uuid4().hex[:16]}"
-    now = datetime.utcnow()
-
-    # Payment check (non-blocking: allow task if payment fails)
-    try:
-        from services.pricing import get_task_price
-        from services.payment_service import PaymentService, InsufficientBalanceError
-
-        price = get_task_price(task_data.task_type.value)
-        PaymentService.charge(
-            db=db,
-            user_id=1,  # anonymous user; replace with auth token later
-            amount=price,
-            task_id=task_id,
-            description=f"Academic task: {task_data.title}",
-        )
-        logger.info(f"Charged {price} RMB for task {task_id}")
-    except InsufficientBalanceError:
-        raise HTTPException(
-            status_code=402,
-            detail={
-                "error": {
-                    "code": "INSUFFICIENT_BALANCE",
-                    "message": f"余额不足。此任务需要 {price} 元，请先充值。",
-                    "price": price,
-                }
-            },
-        )
-    except Exception as e:
-        logger.warning(f"Payment failed, allowing task: {e}")
-        db.rollback()  # Clear pending rollback state from payment failure
-
-    # Rate limit: max 3 research_synthesis tasks per agent wallet per 24 hours
-    if task_data.task_type.value == "research_synthesis":
-        from datetime import timedelta
-        from sqlalchemy import func
-
-        _RL_KEY_PREFIX = "ratelimit:research:"
-        _RL_LIMIT = 20  # per agent per 24h
-        _RL_WINDOW = 86400  # 24h in seconds
-
-        # Try to get agent wallet from request headers (X-Agent-Wallet or Authorization)
-        agent_wallet = (
-            request.headers.get("X-Agent-Wallet") or
-            request.headers.get("x-agent-wallet") or
-            "anonymous"
-        ).lower()
-
-        rate_limited = False
-        redis_available = False
-
-        # Try Redis-based per-agent rate limiting first (sync Redis client)
-        try:
-            from utils.redis_client import get_redis
-            r = get_redis()
-            r.ping()  # verify connection
-            redis_available = True
-            rl_key = f"{_RL_KEY_PREFIX}{agent_wallet}"
-            count_bytes = r.get(rl_key)
-            current_count = int(count_bytes) if count_bytes else 0
-            if current_count >= _RL_LIMIT:
-                rate_limited = True
-            else:
-                pipe = r.pipeline()
-                pipe.incr(rl_key)
-                pipe.expire(rl_key, _RL_WINDOW)
-                pipe.execute()
-        except Exception as redis_err:
-            logger.warning("Redis rate limit unavailable, falling back to per-wallet DB count: %s", redis_err)
-
-        # Fallback: global DB count when Redis is not available (use 10x limit to avoid false positives)
-        if not redis_available and not rate_limited:
-            day_start = datetime.utcnow() - timedelta(hours=24)
-            global_research_today = (
-                db.query(func.count(AcademicTaskModel.task_id))
-                .filter(
-                    AcademicTaskModel.task_type == "research_synthesis",
-                    AcademicTaskModel.created_at >= day_start,
-                )
-                .scalar()
-            ) or 0
-            if global_research_today >= _RL_LIMIT * 10:  # 200/day global hard cap
-                rate_limited = True
-
-        if rate_limited:
-            raise HTTPException(
-                status_code=429,
-                detail={
-                    "error": {
-                        "code": "RATE_LIMIT_EXCEEDED",
-                        "message": "每个 agent 每天最多提交 3 个研究综述任务",
-                        "details": {"limit": 3, "window": "24h"},
-                    }
-                },
-            )
-
-    row = AcademicTaskModel(
-        task_id=task_id,
-        title=task_data.title,
-        description=task_data.description,
-        task_type=task_data.task_type.value,
-        status=AcademicTaskStatus.PENDING.value,
-        input_data=task_data.input_data,
-        parameters=json.dumps(task_data.parameters) if task_data.parameters else None,
-        expected_output=task_data.expected_output,
-        created_at=now,
-        updated_at=now,
+async def submit_academic_task(request: Request):
+    """[已下线] 学术任务创建入口已收敛：任务发布唯一入口为 POST /api/tasks。"""
+    raise HTTPException(
+        status_code=status.HTTP_410_GONE,
+        detail={
+            "error": {
+                "code": "ENDPOINT_RETIRED",
+                "message": "任务发布唯一入口为 POST /api/tasks（软件工程任务市场：自主竞价 + 3 专家评审 + 华币/NAU 奖励）",
+            }
+        },
     )
-
-    db.add(row)
-    db.commit()
-    db.refresh(row)
-
-    logger.info(f"Academic task submitted: {task_id} type={task_data.task_type.value}")
-
-    # A/B experiment assignment (non-blocking)
-    try:
-        from services.sandbox import assign_task_to_experiment
-        assign_task_to_experiment(db, task_id)
-    except Exception as _e:
-        logger.debug("sandbox assign skipped: %s", _e)
-
-    # TaskRouter: classify + store routing decisions in parameters
-    try:
-        from services.task_router import TaskRouter
-        task_router = TaskRouter(db)
-        classification = task_router.classify(task_data.description)
-        logger.info(
-            f"TaskRouter: {task_data.title} -> type={classification.task_type}, "
-            f"complexity={classification.complexity}, raid={classification.suggested_raid_level}"
-        )
-        # Store routing metadata in parameters JSON
-        existing_params = json.loads(row.parameters) if row.parameters else {}
-        existing_params["_routing"] = {
-            "classified_type": classification.task_type,
-            "complexity": str(classification.complexity),
-            "suggested_raid_level": classification.suggested_raid_level,
-            "confidence": classification.confidence,
-            "method": classification.classification_method,
-        }
-        row.parameters = json.dumps(existing_params, ensure_ascii=False)
-        db.commit()
-    except Exception as e:
-        logger.debug(f"TaskRouter classification skipped: {e}")
-
-    # Dispatch to agent-engine asynchronously (fire-and-forget)
-    asyncio.create_task(_dispatch_academic_task(task_id))
-
-    return _model_to_response(row)
 
 
 @router.get("/templates/list")

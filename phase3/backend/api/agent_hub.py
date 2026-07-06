@@ -38,7 +38,6 @@ limiter = Limiter(key_func=get_remote_address)
 
 _bounties_lock = threading.Lock()
 _bounties: dict[str, dict] = {}
-_bounty_counter = 0
 
 # Demo bounties shown when no real bounties exist
 DEMO_BOUNTIES = [
@@ -276,16 +275,6 @@ class LeaderboardEntry(BaseModel):
     name: str
     value: float
     survival_level: Optional[str] = None
-
-
-class BountyCreate(BaseModel):
-    """Create a bounty."""
-    title: str = Field(..., min_length=5, max_length=200)
-    description: str = Field(..., min_length=10, max_length=2000)
-    reward_usdc: float = Field(..., gt=0, le=100000)
-    required_capabilities: List[str] = Field(default_factory=list)
-    deadline_hours: int = Field(default=72, ge=1, le=720)
-    difficulty: str = Field(default="medium")
 
 
 class BountyResponse(BaseModel):
@@ -756,62 +745,19 @@ async def list_bounties(
     }
 
 
-@router.post("/bounties", response_model=dict, status_code=201)
+@router.post("/bounties")
 @limiter.limit("10/minute")
-async def create_bounty(
-    request: Request,
-    bounty: BountyCreate,
-    current_agent: Agent = Depends(get_current_agent),
-    db: Session = Depends(get_db),
-):
-    """
-    Create a bounty (agent hiring agent).
-
-    Requires agent authentication via API key.
-    """
-    global _bounty_counter
-
-    now = datetime.utcnow()
-    deadline = now + timedelta(hours=bounty.deadline_hours)
-
-    valid_difficulties = {"easy", "medium", "hard", "expert"}
-    difficulty = bounty.difficulty.lower()
-    if difficulty not in valid_difficulties:
-        raise HTTPException(
-            status_code=400,
-            detail={
-                "error": {
-                    "code": "INVALID_DIFFICULTY",
-                    "message": f"Difficulty must be one of: {', '.join(valid_difficulties)}",
-                }
-            },
-        )
-
-    with _bounties_lock:
-        _bounty_counter += 1
-        bounty_id = f"bounty_{_bounty_counter}_{secrets.token_hex(4)}"
-        entry = {
-            "bounty_id": bounty_id,
-            "title": bounty.title,
-            "description": bounty.description,
-            "reward_usdc": bounty.reward_usdc,
-            "required_capabilities": bounty.required_capabilities,
-            "posted_by_agent_id": current_agent.agent_id,
-            "posted_by_name": current_agent.name,
-            "difficulty": difficulty,
-            "deadline": deadline,
-            "created_at": now,
-            "status": "open",
-        }
-        _bounties[bounty_id] = entry
-
-    logger.info(f"Bounty created: {bounty_id} by agent {current_agent.agent_id}")
-
-    return {
-        "success": True,
-        "data": BountyResponse(**entry).model_dump(),
-        "error": None,
-    }
+async def create_bounty(request: Request):
+    """[已下线] 悬赏创建入口已收敛：任务发布唯一入口为 POST /api/tasks。"""
+    raise HTTPException(
+        status_code=410,
+        detail={
+            "error": {
+                "code": "ENDPOINT_RETIRED",
+                "message": "任务发布唯一入口为 POST /api/tasks（软件工程任务市场：自主竞价 + 3 专家评审 + 华币/NAU 奖励）",
+            }
+        },
+    )
 
 
 # ============================================================

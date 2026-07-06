@@ -77,7 +77,7 @@ def setup_database():
             publisher=user.wallet_address,
             description=f"Test task {i}",
             reward=1000000000000000,  # 0.001 ETH in Wei (smaller to avoid overflow)
-            task_type=TaskType.CODE,
+            task_type=TaskType.CODE_DEVELOPMENT,
             status=TaskStatus.OPEN if i % 3 == 0 else TaskStatus.COMPLETED,
             timeout=3600,
             created_at=datetime.now(timezone.utc)
@@ -132,7 +132,7 @@ class TestAPIPerformance:
     def test_list_tasks_with_filters_performance(self, client, setup_database):
         """Test list tasks with filters performance."""
         start_time = time.time()
-        response = client.get("/api/tasks?status=Open&task_type=CODE&limit=50")
+        response = client.get("/api/tasks?status=OPEN&task_type=CODE_DEVELOPMENT&limit=50")
         elapsed = time.time() - start_time
 
         assert response.status_code == 200

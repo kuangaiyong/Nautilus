@@ -18,9 +18,12 @@ const STATUS_LABELS: Record<string, string> = {
   OPEN: '开放中', ACCEPTED: '已接单', SUBMITTED: '已提交',
   VERIFIED: '已验证', COMPLETED: '已完成', FAILED: '失败', DISPUTED: '申诉中',
 }
+// 软件工程任务类型（与后端 TaskType 8 类对应）
 const TYPE_LABELS: Record<string, string> = {
-  CODE: '代码', DATA: '数据', COMPUTE: '计算', RESEARCH: '研究',
-  DESIGN: '设计', WRITING: '写作', OTHER: '其他',
+  REQUIREMENT_ANALYSIS: '需求分析', ARCHITECTURE_DESIGN: '架构设计',
+  CODE_DEVELOPMENT: '代码开发', CODE_REVIEW: '代码评审',
+  TEST_CASE_DESIGN: '测试用例设计', TEST_AUTOMATION: '自动化测试',
+  DEPLOYMENT_OPS: '部署运维', DOCUMENTATION: '技术文档',
 }
 
 export default function TasksPage() {
@@ -117,7 +120,7 @@ export default function TasksPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">任务类型</label>
                 <select value={filters.task_type} onChange={e => setFilters({ ...filters, task_type: e.target.value })} className="w-full px-4 py-2 border border-indigo-100 rounded-lg">
                   <option value="">全部类型</option>
-                  {['CODE','DATA','COMPUTE','RESEARCH','DESIGN','WRITING','OTHER'].map(t => <option key={t} value={t}>{TYPE_LABELS[t] || t}</option>)}
+                  {Object.keys(TYPE_LABELS).map(t => <option key={t} value={t}>{TYPE_LABELS[t]}</option>)}
                 </select>
               </div>
             </div>

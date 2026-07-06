@@ -221,7 +221,7 @@ class UserRepository:
         task_result = {
             "status": "COMPLETED",
             "approach": "Test-Driven Development",
-            "task_type": "CODE"
+            "task_type": "CODE_DEVELOPMENT"
         }
 
         concepts = reflection_service.extract_concepts(task_result)
@@ -354,7 +354,7 @@ class ComplexAlgorithm:
         """测试生成洞察"""
         task_result = {
             "status": "COMPLETED",
-            "task_type": "CODE"
+            "task_type": "CODE_DEVELOPMENT"
         }
 
         knowledge_nodes = [
@@ -504,7 +504,7 @@ class CacheService:
             "language": "python",
             "description": "Implement caching with Service Pattern",
             "approach": "Design Pattern Implementation",
-            "task_type": "CODE",
+            "task_type": "CODE_DEVELOPMENT",
             "execution_steps": [
                 {
                     "description": "Create service class",

@@ -138,7 +138,7 @@ class TestGetBalance:
             task = Task(
                 title="Test Task",
                 description="Test",
-                task_type="CODE",
+                task_type="CODE_DEVELOPMENT",
                 reward_amount=100.0,
                 creator_id=test_user.id,
                 status="Completed"
@@ -209,7 +209,7 @@ class TestGetHistory:
             task = Task(
                 title="Test Task",
                 description="Test",
-                task_type="CODE",
+                task_type="CODE_DEVELOPMENT",
                 reward_amount=100.0,
                 creator_id=test_user.id,
                 status="Completed"
@@ -251,7 +251,7 @@ class TestGetHistory:
             task = Task(
                 title="Test Task",
                 description="Test",
-                task_type="CODE",
+                task_type="CODE_DEVELOPMENT",
                 reward_amount=1000.0,
                 creator_id=test_user.id,
                 status="Completed"
@@ -297,7 +297,7 @@ class TestGetHistory:
             task = Task(
                 title="Test Task",
                 description="Test",
-                task_type="CODE",
+                task_type="CODE_DEVELOPMENT",
                 reward_amount=100.0,
                 creator_id=test_user.id,
                 status="Completed"
@@ -348,7 +348,7 @@ class TestWithdrawRewards:
             task = Task(
                 title="Test Task",
                 description="Test",
-                task_type="CODE",
+                task_type="CODE_DEVELOPMENT",
                 reward_amount=100.0,
                 creator_id=test_user.id,
                 status="Completed"
@@ -423,7 +423,7 @@ class TestRewardStatistics:
             task = Task(
                 title="Test Task",
                 description="Test",
-                task_type="CODE",
+                task_type="CODE_DEVELOPMENT",
                 reward_amount=100.0,
                 creator_id=test_user.id,
                 status="Completed"
@@ -466,7 +466,7 @@ class TestRewardsByTask:
             task = Task(
                 title="Test Task",
                 description="Test",
-                task_type="CODE",
+                task_type="CODE_DEVELOPMENT",
                 reward_amount=100.0,
                 creator_id=test_user.id,
                 status="Completed"
@@ -517,7 +517,7 @@ class TestRewardsByAgent:
             task = Task(
                 title="Test Task",
                 description="Test",
-                task_type="CODE",
+                task_type="CODE_DEVELOPMENT",
                 reward_amount=100.0,
                 creator_id=test_user.id,
                 status="Completed"
@@ -559,7 +559,7 @@ class TestRewardEdgeCases:
             task = Task(
                 title="Test Task",
                 description="Test",
-                task_type="CODE",
+                task_type="CODE_DEVELOPMENT",
                 reward_amount=1000000.0,
                 creator_id=test_user.id,
                 status="Completed"
@@ -594,7 +594,7 @@ class TestRewardEdgeCases:
             task = Task(
                 title="Test Task",
                 description="Test",
-                task_type="CODE",
+                task_type="CODE_DEVELOPMENT",
                 reward_amount=1.0,
                 creator_id=test_user.id,
                 status="Completed"
@@ -629,7 +629,7 @@ class TestRewardEdgeCases:
             task = Task(
                 title="Test Task",
                 description="Test",
-                task_type="CODE",
+                task_type="CODE_DEVELOPMENT",
                 reward_amount=100.0,
                 creator_id=test_user.id,
                 status="Completed"

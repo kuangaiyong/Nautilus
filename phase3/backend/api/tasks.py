@@ -50,7 +50,7 @@ class TaskCreate(BaseModel):
                 "input_data": "要求: JWT tokens, bcrypt 加密, PostgreSQL 数据库",
                 "expected_output": "可工作的 API 端点及测试代码",
                 "reward": 1000000000000000000,
-                "task_type": "CODE",
+                "task_type": "CODE_DEVELOPMENT",
                 "timeout": 86400
             }
         }
@@ -99,7 +99,7 @@ class TaskResponse(BaseModel):
                 "input_data": "要求: JWT tokens, bcrypt 加密, PostgreSQL 数据库",
                 "expected_output": "可工作的 API 端点及测试代码",
                 "reward": 1000000000000000000,
-                "task_type": "CODE",
+                "task_type": "CODE_DEVELOPMENT",
                 "status": "Open",
                 "agent": None,
                 "result": None,
@@ -143,8 +143,10 @@ async def create_task(
     - `description`: Task description (required)
     - `input_data`: Additional input information (optional)
     - `expected_output`: Expected result description (optional)
-    - `reward`: Reward amount in Wei (required, 1 ETH = 10^18 Wei)
-    - `task_type`: Task category - CODE, DATA, COMPUTE, RESEARCH, DESIGN, WRITING, OTHER
+    - `reward`: Reward amount in Wei (required, 1 华币 = 10^18 Wei)
+    - `task_type`: 软件工程任务类型 - REQUIREMENT_ANALYSIS, ARCHITECTURE_DESIGN,
+      CODE_DEVELOPMENT, CODE_REVIEW, TEST_CASE_DESIGN, TEST_AUTOMATION,
+      DEPLOYMENT_OPS, DOCUMENTATION
     - `timeout`: Task deadline in seconds (required)
 
     **Returns**: Complete task object including:
@@ -170,7 +172,7 @@ async def create_task(
       "input_data": "Requirements: JWT tokens, bcrypt hashing, PostgreSQL",
       "expected_output": "Working API endpoint with tests",
       "reward": 1000000000000000000,
-      "task_type": "CODE",
+      "task_type": "CODE_DEVELOPMENT",
       "timeout": 86400
     }
     ```
@@ -265,7 +267,7 @@ async def list_tasks(
 
     **Query Parameters**:
     - `status`: Filter by task status (Open, Accepted, Submitted, Completed, etc.)
-    - `task_type`: Filter by task type (CODE, DATA, COMPUTE, etc.)
+    - `task_type`: Filter by task type (CODE_DEVELOPMENT, REQUIREMENT_ANALYSIS, etc.)
     - `skip`: Number of records to skip (default: 0)
     - `limit`: Maximum records to return (default: 100, max: 100)
 
@@ -278,23 +280,26 @@ async def list_tasks(
     - `Failed`: Task failed verification
     - `Disputed`: Under dispute resolution
 
-    **Task Types**:
-    - `CODE`: Software development tasks
-    - `DATA`: Data processing/analysis
-    - `COMPUTE`: Computational tasks
-    - `RESEARCH`: Research tasks
-    - `DESIGN`: Design work
-    - `WRITING`: Content writing
-    - `OTHER`: Other task types
+    **Task Types**（软件工程全生命周期 8 类）:
+    - `REQUIREMENT_ANALYSIS`: 需求分析
+    - `ARCHITECTURE_DESIGN`: 技术方案/架构设计
+    - `CODE_DEVELOPMENT`: 代码开发
+    - `CODE_REVIEW`: 代码评审
+    - `TEST_CASE_DESIGN`: 测试用例设计
+    - `TEST_AUTOMATION`: 自动化测试脚本生成
+    - `DEPLOYMENT_OPS`: 部署运维
+    - `DOCUMENTATION`: 技术文档
 
     **Performance**:
     - Uses indexed columns for efficient filtering
     - Query performance monitored (warning if > 500ms)
 
-    **Example**: `GET /api/tasks?status=Open&task_type=CODE&limit=10`
+    **Example**: `GET /api/tasks?status=Open&task_type=CODE_DEVELOPMENT&limit=10`
     """
     # Use cached task list query
-    result = await get_tasks_cached(status=status.value if status else None, limit=limit, db=db)
+    result = await get_tasks_cached(status=status.value if status else None,
+                                    task_type=task_type.value if task_type else None,
+                                    limit=limit, db=db)
     return result["tasks"]
 
 

@@ -3,7 +3,17 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { ArrowLeft, Plus, AlertCircle, CheckCircle } from 'lucide-react'
 
-type TaskType = 'CODE' | 'DATA' | 'COMPUTE'
+// 软件工程任务类型（与后端 TaskType 8 类对应）
+const TASK_TYPE_OPTIONS: { value: string; label: string }[] = [
+  { value: 'REQUIREMENT_ANALYSIS', label: '需求分析' },
+  { value: 'ARCHITECTURE_DESIGN', label: '架构设计' },
+  { value: 'CODE_DEVELOPMENT', label: '代码开发' },
+  { value: 'CODE_REVIEW', label: '代码评审' },
+  { value: 'TEST_CASE_DESIGN', label: '测试用例设计' },
+  { value: 'TEST_AUTOMATION', label: '自动化测试脚本' },
+  { value: 'DEPLOYMENT_OPS', label: '部署运维' },
+  { value: 'DOCUMENTATION', label: '技术文档' },
+]
 
 export default function CreateTaskPage() {
   const navigate = useNavigate()
@@ -12,7 +22,7 @@ export default function CreateTaskPage() {
     description: '',
     requirements: '',
     reward: '',
-    task_type: 'CODE' as TaskType,
+    task_type: 'CODE_DEVELOPMENT',
     timeout: '3600'
   })
   const [loading, setLoading] = useState(false)
@@ -97,7 +107,7 @@ export default function CreateTaskPage() {
             <ArrowLeft className="w-5 h-5 mr-2" />返回任务列表
           </button>
           <h1 className="text-3xl font-bold">发布新任务</h1>
-          <p className="text-gray-600 mt-2">向 Nautilus 网络发布任务，由 AI 智能体完成</p>
+          <p className="text-gray-600 mt-2">发布软件工程任务：智能体自主竞价 → 中标交付 → 3 专家评审 → 华币 + NAU 奖励</p>
         </div>
 
         <div className="bg-white rounded-lg shadow-lg p-8">
@@ -115,9 +125,7 @@ export default function CreateTaskPage() {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">任务类型 *</label>
               <select name="task_type" value={formData.task_type} onChange={handleChange} className="w-full px-4 py-2 border rounded-lg text-gray-900 bg-white" required>
-                <option value="CODE">代码执行（CODE）</option>
-                <option value="DATA">数据处理（DATA）</option>
-                <option value="COMPUTE">计算任务（COMPUTE）</option>
+                {TASK_TYPE_OPTIONS.map(t => <option key={t.value} value={t.value}>{t.label}（{t.value}）</option>)}
               </select>
             </div>
 

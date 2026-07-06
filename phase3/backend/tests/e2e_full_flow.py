@@ -116,7 +116,7 @@ def main():
     step("4. 发布任务（奖励以 wei 计，初始 OPEN）")
     r = requests.post(f"{API}/api/tasks", headers=auth(PUB), json={
         "description": "实现 reverse(s) 字符串反转并附 pytest", "input_data": "def reverse(s:str)->str",
-        "expected_output": "通过单测的实现", "reward": REWARD * ONE, "task_type": "CODE", "timeout": 86400})
+        "expected_output": "通过单测的实现", "reward": REWARD * ONE, "task_type": "CODE_DEVELOPMENT", "timeout": 86400})
     need(r.status_code == 201, f"创建任务 HTTP {r.status_code}")
     task = r.json(); TID = task["id"]
     need(task["status"] == "OPEN", f"任务初始状态 OPEN (id={TID})")

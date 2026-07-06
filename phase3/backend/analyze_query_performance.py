@@ -60,7 +60,7 @@ def check_common_queries():
         # List tasks with type filter
         (
             "SELECT * FROM tasks WHERE task_type = :task_type ORDER BY created_at DESC LIMIT 50",
-            {"task_type": "CODE"},
+            {"task_type": "CODE_DEVELOPMENT"},
             "List tasks with type filter"
         ),
 

@@ -8,17 +8,20 @@ from __future__ import annotations
 import json
 from typing import Optional
 
-# 5 个软件工程任务类型（与 models.database.TaskType 对应）
+# 8 个软件工程任务类型（全生命周期，与 models.database.TaskType 对应）
 SE_TASK_TYPES = {
     "REQUIREMENT_ANALYSIS",
     "ARCHITECTURE_DESIGN",
+    "CODE_DEVELOPMENT",
+    "CODE_REVIEW",
     "TEST_CASE_DESIGN",
     "TEST_AUTOMATION",
-    "CODE_DEVELOPMENT",
+    "DEPLOYMENT_OPS",
+    "DOCUMENTATION",
 }
 
 # NAU 奖励额度的单一来源在 services/nautilus_token.TASK_TYPE_REWARDS（铸造时读取），
-# 已为 5 个 SE 类型登记额度，避免在此重复维护。
+# 已为全部 8 个 SE 类型登记额度，避免在此重复维护。
 
 # 任务类型 → 专长关键词（用于专长匹配加分；中英混合，子串命中即算匹配）
 SPECIALTY_HINTS = {
@@ -27,6 +30,9 @@ SPECIALTY_HINTS = {
     "TEST_CASE_DESIGN": {"test", "测试", "qa", "用例", "case"},
     "TEST_AUTOMATION": {"test", "测试", "automation", "自动化", "selenium", "pytest", "playwright"},
     "CODE_DEVELOPMENT": {"code", "代码", "develop", "开发", "python", "java", "backend", "frontend", "后端", "前端"},
+    "CODE_REVIEW": {"review", "评审", "code", "代码", "audit", "审查", "quality", "质量"},
+    "DEPLOYMENT_OPS": {"deploy", "部署", "ops", "运维", "devops", "docker", "k8s", "kubernetes", "ci", "cd", "sre"},
+    "DOCUMENTATION": {"doc", "文档", "writing", "写作", "manual", "手册", "wiki", "技术写作"},
 }
 
 # 评审配置

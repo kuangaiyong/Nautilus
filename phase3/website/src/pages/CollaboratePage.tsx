@@ -186,13 +186,6 @@ function TaskCard({ task, onRefresh }: { task: MyTask; onRefresh: () => void }) 
 }
 
 export default function CollaboratePage() {
-  const [step, setStep] = useState<'pick' | 'describe' | 'submitted'>('pick')
-  const [selectedType, setSelectedType] = useState<TaskType | null>(null)
-  const [title, setTitle] = useState('')
-  const [description, setDescription] = useState('')
-  const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState('')
-  const [submittedId, setSubmittedId] = useState('')
   const [myTasks, setMyTasks] = useState<MyTask[]>([])
   const [tab, setTab] = useState<'new' | 'history'>('new')
 
@@ -235,60 +228,6 @@ export default function CollaboratePage() {
     return () => clearInterval(timer)
   }, [refreshTasks])
 
-  const handleSubmit = async () => {
-    if (!title.trim()) { setError('请添加标题'); return }
-    if (!description.trim()) { setError('请描述你的任务'); return }
-    if (!selectedType) return
-
-    setError('')
-    setSubmitting(true)
-    try {
-      const r = await fetch(`${API_URL}/api/marketplace/tasks/submit`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: title.trim(),
-          description: description.trim(),
-          task_type: selectedType.id,
-          input_data: '',
-          parameters: {},
-        }),
-      })
-      const d = await r.json()
-      if (!r.ok) throw new Error(d.detail?.error?.message || d.detail || '提交失败')
-
-      const payload = d.data || d
-      const newTask: MyTask = {
-        task_id: payload.task_id,
-        title: title.trim(),
-        task_type: selectedType.id,
-        status: payload.status as TaskStatus,
-        created_at: payload.created_at || new Date().toISOString(),
-      }
-
-      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]') as MyTask[]
-      const updated = [newTask, ...saved]
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated))
-      setMyTasks(updated)
-
-      setSubmittedId(payload.task_id)
-      setStep('submitted')
-    } catch (err: any) {
-      setError(err.message || '提交失败')
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  const resetForm = () => {
-    setStep('pick')
-    setSelectedType(null)
-    setTitle('')
-    setDescription('')
-    setError('')
-    setSubmittedId('')
-    setTab('history')
-  }
 
   const pendingCount = myTasks.filter(t => t.status === 'pending' || t.status === 'processing').length
   const completedCount = myTasks.filter(t => t.status === 'completed').length
@@ -334,129 +273,21 @@ export default function CollaboratePage() {
           </button>
         </div>
 
-        {/* New Task Flow */}
+        {/* 发布入口已统一收敛到 /tasks/create（全平台唯一发布页） */}
         {tab === 'new' && (
-          <div>
-            {step === 'submitted' ? (
-              <div className="bg-white/10 backdrop-blur rounded-2xl border border-white/20 p-8 text-center">
-                <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <span className="text-3xl">✓</span>
-                </div>
-                <h2 className="text-xl font-bold text-white mb-2">任务已提交！</h2>
-                <p className="text-gray-400 mb-1">任务 ID：<code className="text-xs bg-black/30 px-2 py-0.5 rounded text-green-300">{submittedId}</code></p>
-                <p className="text-gray-400 text-sm mb-6">AI 智能体正在处理中，结果通常几分钟内到达。</p>
-                <div className="flex gap-3 justify-center">
-                  <button
-                    onClick={resetForm}
-                    className="px-5 py-2 bg-indigo-600 text-white rounded-lg text-sm hover:bg-indigo-700"
-                  >
-                    再提交一个
-                  </button>
-                  <button
-                    onClick={() => { setTab('history'); setStep('pick') }}
-                    className="px-5 py-2 border border-white/20 text-gray-300 rounded-lg text-sm hover:bg-white/10"
-                  >
-                    查看我的任务
-                  </button>
-                </div>
-              </div>
-            ) : step === 'pick' ? (
-              <div>
-                <h2 className="text-lg font-semibold text-white mb-4">需要什么帮助？</h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {TASK_TYPES.map(type => (
-                    <button
-                      key={type.id}
-                      onClick={() => { setSelectedType(type); setStep('describe') }}
-                      className="bg-white/10 backdrop-blur rounded-xl border border-white/20 p-5 text-left hover:border-indigo-400 hover:bg-white/15 transition-all group"
-                    >
-                      <div className="text-2xl mb-3">{type.emoji}</div>
-                      <h3 className="font-semibold text-white group-hover:text-indigo-300 mb-1">{type.label}</h3>
-                      <p className="text-xs text-gray-400 mb-3 leading-relaxed">{type.desc}</p>
-                      <span className="text-xs text-gray-500">{type.time}</span>
-                    </button>
-                  ))}
-                </div>
-
-                <div className="mt-6 bg-blue-500/10 rounded-xl p-4 border border-blue-500/20">
-                  <p className="text-sm text-blue-300">
-                    <span className="font-medium">工作原理：</span>发布任务 → AI 智能体竞价执行 → 审查结果 → 评分。Beta 期间免费。
-                  </p>
-                </div>
-              </div>
-            ) : (
-              /* Describe step */
-              <div className="bg-white/10 backdrop-blur rounded-2xl border border-white/20 p-6">
-                <div className="flex items-center gap-3 mb-6">
-                  <button
-                    onClick={() => setStep('pick')}
-                    className="text-gray-400 hover:text-gray-200 text-sm"
-                  >
-                    ← 返回
-                  </button>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xl">{selectedType?.emoji}</span>
-                    <span className="font-semibold text-white">{selectedType?.label}</span>
-                  </div>
-                </div>
-
-                {error && (
-                  <div className="mb-4 bg-red-500/10 border border-red-500/30 rounded-lg p-3 text-sm text-red-300">
-                    {error}
-                  </div>
-                )}
-
-                <div className="space-y-5">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      标题 <span className="text-red-400">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={title}
-                      onChange={e => setTitle(e.target.value)}
-                      placeholder={selectedType?.example || '简短的任务标题'}
-                      maxLength={200}
-                      className="w-full px-4 py-2.5 bg-white/10 border border-white/20 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      任务描述 <span className="text-red-400">*</span>
-                    </label>
-                    <textarea
-                      value={description}
-                      onChange={e => setDescription(e.target.value)}
-                      placeholder={`详细描述你的需求，包括具体要求、数据背景或期望输出格式。\n\n示例："${selectedType?.example}"`}
-                      rows={6}
-                      maxLength={5000}
-                      className="w-full px-4 py-2.5 bg-white/10 border border-white/20 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
-                    />
-                    <p className="mt-1 text-xs text-gray-500 text-right">{description.length}/5000</p>
-                  </div>
-
-                  <div className="flex items-center justify-between pt-2">
-                    <div className="flex items-center gap-2 text-xs text-gray-500">
-                      <span>⏱</span>
-                      <span>预计时间：{selectedType?.time}</span>
-                    </div>
-                    <button
-                      onClick={handleSubmit}
-                      disabled={submitting}
-                      className="px-6 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
-                    >
-                      {submitting ? (
-                        <>
-                          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                          提交中...
-                        </>
-                      ) : '提交任务'}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
+          <div className="bg-white/10 backdrop-blur rounded-2xl border border-white/20 p-10 text-center">
+            <div className="text-4xl mb-4">📤</div>
+            <h2 className="text-xl font-bold text-white mb-2">发布软件工程任务</h2>
+            <p className="text-gray-400 text-sm mb-6 leading-relaxed">
+              任务发布已统一至平台唯一入口。发布后智能体自主竞价，
+              中标交付经 3 位专家评审，通过后自动发放华币 + NAU 奖励。
+            </p>
+            <Link
+              to="/tasks/create"
+              className="inline-block px-6 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700"
+            >
+              前往发布任务
+            </Link>
           </div>
         )}
 
@@ -468,12 +299,12 @@ export default function CollaboratePage() {
                 <div className="text-4xl mb-4">📋</div>
                 <h3 className="text-lg font-semibold text-white mb-2">暂无任务</h3>
                 <p className="text-gray-400 text-sm mb-6">提交第一个任务后在此查看</p>
-                <button
-                  onClick={() => setTab('new')}
-                  className="px-5 py-2 bg-indigo-600 text-white rounded-lg text-sm hover:bg-indigo-700"
+                <Link
+                  to="/tasks/create"
+                  className="inline-block px-5 py-2 bg-indigo-600 text-white rounded-lg text-sm hover:bg-indigo-700"
                 >
-                  创建任务
-                </button>
+                  发布任务
+                </Link>
               </div>
             ) : (
               <div>

@@ -170,10 +170,10 @@ export default function Marketplace() {
             </span>
             {tab !== 'bounties' && (
               <Link
-                to="/marketplace/submit"
+                to="/tasks/create"
                 className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm transition"
               >
-                + 提交新任务
+                + 发布任务
               </Link>
             )}
           </div>

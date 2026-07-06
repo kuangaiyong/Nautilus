@@ -232,7 +232,7 @@ class TestAuthorization:
             json={
                 "description": "Test task",
                 "reward": 1000000000000000000,
-                "task_type": "CODE",
+                "task_type": "CODE_DEVELOPMENT",
                 "timeout": 3600
             },
             headers={"Authorization": f"Bearer {publisher_token}"}
@@ -265,7 +265,7 @@ class TestInputValidation:
             json={
                 "description": "'; DROP TABLE tasks; --",
                 "reward": 1000000000000000000,
-                "task_type": "CODE",
+                "task_type": "CODE_DEVELOPMENT",
                 "timeout": 3600
             },
             headers={"Authorization": f"Bearer {auth_token}"}
@@ -325,7 +325,7 @@ class TestInputValidation:
             json={
                 "description": "Test task",
                 "reward": -1000,
-                "task_type": "CODE",
+                "task_type": "CODE_DEVELOPMENT",
                 "timeout": 3600
             },
             headers={"Authorization": f"Bearer {auth_token}"}
@@ -339,7 +339,7 @@ class TestInputValidation:
             json={
                 "description": "",
                 "reward": 1000000000000000000,
-                "task_type": "CODE",
+                "task_type": "CODE_DEVELOPMENT",
                 "timeout": 3600
             },
             headers={"Authorization": f"Bearer {auth_token}"}

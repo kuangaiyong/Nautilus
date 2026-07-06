@@ -32,7 +32,7 @@ async def test_memory_system():
         print("\n3. Storing test memory...")
         execution_data = {
             "description": "Test task for memory system",
-            "task_type": "CODE",
+            "task_type": "CODE_DEVELOPMENT",
             "status": "COMPLETED",
             "result": "Successfully completed test task",
             "reward": 1000000000000000000
@@ -84,7 +84,7 @@ async def test_memory_system():
         print("\n8. Creating reflection...")
         result = {
             "description": "Test task",
-            "task_type": "CODE",
+            "task_type": "CODE_DEVELOPMENT",
             "status": "COMPLETED",
             "result": "Success",
             "execution_time": 120

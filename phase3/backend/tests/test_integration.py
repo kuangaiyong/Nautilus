@@ -189,7 +189,7 @@ class TestTasksAPI:
                 "input_data": "input",
                 "expected_output": "output",
                 "reward": 100,
-                "task_type": "CODE",
+                "task_type": "CODE_DEVELOPMENT",
                 "timeout": 3600
             }
         )
@@ -223,7 +223,7 @@ class TestTasksAPI:
                 "input_data": "input",
                 "expected_output": "output",
                 "reward": 100,
-                "task_type": "CODE",
+                "task_type": "CODE_DEVELOPMENT",
                 "timeout": 3600
             }
         )
@@ -253,7 +253,7 @@ class TestTasksAPI:
                 "input_data": "input",
                 "expected_output": "output",
                 "reward": 100,
-                "task_type": "CODE",
+                "task_type": "CODE_DEVELOPMENT",
                 "timeout": 3600
             }
         )
@@ -393,7 +393,7 @@ class TestEndToEnd:
                 "input_data": "1,2",
                 "expected_output": "3",
                 "reward": 100,
-                "task_type": "COMPUTE",
+                "task_type": "DEPLOYMENT_OPS",
                 "timeout": 3600
             }
         )

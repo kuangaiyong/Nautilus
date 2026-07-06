@@ -3,7 +3,7 @@ Data Labeling SaaS API - B2B labeling service with Raid consensus.
 
 Wraps the BatchProcessor engine as a REST API for external clients.
 """
-from fastapi import APIRouter, HTTPException, Request, Query, UploadFile, File, Form, status
+from fastapi import APIRouter, HTTPException, Request, Query, status
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
@@ -12,9 +12,6 @@ from datetime import datetime, timezone
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 import asyncio
-import csv
-import io
-import uuid
 import logging
 import os
 
@@ -60,42 +57,6 @@ class JobStatus(str, Enum):
     FAILED = "failed"
     CANCELLED = "cancelled"
 
-
-class CreateLabelingJobRequest(BaseModel):
-    """Request body to create a new labeling job."""
-    name: str = Field(..., min_length=1, max_length=200)
-    labeling_type: LabelingType
-    items: List[str] = Field(..., min_length=1, max_length=10000)
-    labels: Optional[List[str]] = Field(
-        None, description="Available labels for classification tasks"
-    )
-    num_agents: int = Field(
-        default=3, ge=1, le=10,
-        description="Number of Raid consensus agents"
-    )
-    consensus_threshold: float = Field(
-        default=0.67, ge=0.5, le=1.0,
-        description="Agreement ratio required for consensus"
-    )
-    instructions: Optional[str] = Field(
-        None, max_length=2000,
-        description="Custom labeling instructions"
-    )
-
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "name": "Product review sentiment",
-                "labeling_type": "sentiment",
-                "items": [
-                    "This product is amazing, best purchase ever!",
-                    "Terrible quality, broke after one day.",
-                    "It's okay, nothing special.",
-                ],
-                "num_agents": 3,
-                "consensus_threshold": 0.67,
-            }
-        }
 
 
 class LabelingItemResult(BaseModel):
@@ -201,74 +162,19 @@ def _map_labeling_type(api_type: LabelingType) -> str:
 # Endpoints
 # ---------------------------------------------------------------------------
 
-@router.post(
-    "/jobs",
-    response_model=LabelingJobResponse,
-    status_code=status.HTTP_201_CREATED,
-)
+@router.post("/jobs")
 @limiter.limit("5/minute")
-async def create_labeling_job(
-    request: Request,
-    body: CreateLabelingJobRequest,
-):
-    """
-    Create a new data labeling job.
-
-    Dispatches items to the BatchProcessor with Raid consensus.
-    Returns immediately with a job_id for polling status.
-
-    **Rate Limit**: 5 requests per minute
-
-    **Request Body**:
-    - `name`: Job name (max 200 chars)
-    - `labeling_type`: Type of labeling task
-    - `items`: List of text strings to label (max 10,000)
-    - `labels`: Optional list of allowed labels (for classification)
-    - `num_agents`: Raid consensus agents (1-10, default 3)
-    - `consensus_threshold`: Agreement ratio (0.5-1.0, default 0.67)
-    - `instructions`: Optional custom instructions
-
-    **Returns**: Created job with `job_id` for polling.
-    """
-    now = datetime.now(timezone.utc).isoformat()
-    job_id = f"lbl_{uuid.uuid4().hex[:16]}"
-
-    # Payment check (non-blocking: allow job if payment fails)
-    try:
-        from services.pricing import get_task_price
-        price = get_task_price(body.labeling_type.value, num_items=len(body.items))
-        logger.info(f"Labeling job {job_id} price: {price} RMB ({len(body.items)} items)")
-    except Exception as e:
-        logger.warning(f"Pricing lookup failed for labeling job: {e}")
-
-    job = {
-        "job_id": job_id,
-        "name": body.name,
-        "labeling_type": body.labeling_type.value,
-        "status": JobStatus.PENDING.value,
-        "total_items": len(body.items),
-        "created_at": now,
-        "updated_at": now,
-        "items_raw": body.items,
-        "labels": body.labels,
-        "num_agents": body.num_agents,
-        "consensus_threshold": body.consensus_threshold,
-        "instructions": body.instructions,
-        "results": None,
-        "quality_report": None,
-        "processing_time_s": None,
-    }
-
-    _labeling_jobs[job_id] = job
-    logger.info(
-        "Labeling job created: %s type=%s items=%d agents=%d",
-        job_id, body.labeling_type.value, len(body.items), body.num_agents,
+async def create_labeling_job(request: Request):
+    """[已下线] 数据标注任务创建入口已收敛：任务发布唯一入口为 POST /api/tasks。"""
+    raise HTTPException(
+        status_code=status.HTTP_410_GONE,
+        detail={
+            "error": {
+                "code": "ENDPOINT_RETIRED",
+                "message": "任务发布唯一入口为 POST /api/tasks（软件工程任务市场：自主竞价 + 3 专家评审 + 华币/NAU 奖励）",
+            }
+        },
     )
-
-    # Fire-and-forget background processing
-    asyncio.create_task(_dispatch_labeling_job(job_id))
-
-    return _job_to_response(job)
 
 
 @router.get("/jobs/{job_id}", response_model=LabelingJobResponse)
@@ -496,151 +402,19 @@ async def list_labeling_prices(request: Request):
 # CSV batch upload
 # ---------------------------------------------------------------------------
 
-@router.post(
-    "/jobs/upload",
-    response_model=LabelingJobResponse,
-    status_code=status.HTTP_201_CREATED,
-)
+@router.post("/jobs/upload")
 @limiter.limit("5/minute")
-async def create_labeling_job_from_csv(
-    request: Request,
-    file: UploadFile = File(..., description="CSV file with a 'text' column"),
-    name: str = Form(..., max_length=200),
-    labeling_type: LabelingType = Form(...),
-    num_agents: int = Form(default=3, ge=1, le=10),
-    consensus_threshold: float = Form(default=0.67, ge=0.5, le=1.0),
-    instructions: Optional[str] = Form(default=None, max_length=2000),
-    labels: Optional[str] = Form(
-        default=None,
-        description="Comma-separated labels for classification tasks",
-    ),
-):
-    """
-    Create a labeling job by uploading a CSV file.
-
-    The CSV must have a column named `text`. An optional `id` column is used
-    as the item identifier; otherwise rows are numbered sequentially.
-
-    **Rate Limit**: 5 requests per minute
-
-    **Form Fields**:
-    - `file`: CSV file (max 10 MB)
-    - `name`: Job name
-    - `labeling_type`: Type of labeling task
-    - `num_agents`: Consensus agents (1-10, default 3)
-    - `consensus_threshold`: Agreement ratio (0.5-1.0, default 0.67)
-    - `instructions`: Optional custom instructions
-    - `labels`: Optional comma-separated labels
-    """
-    # Validate file type
-    if file.content_type and file.content_type not in (
-        "text/csv",
-        "application/vnd.ms-excel",
-        "application/octet-stream",
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={
-                "error": {
-                    "code": "INVALID_FILE_TYPE",
-                    "message": f"Expected CSV file, got '{file.content_type}'",
-                }
-            },
-        )
-
-    # Read and parse CSV
-    raw = await file.read()
-    if len(raw) > 10 * 1024 * 1024:  # 10 MB limit
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={
-                "error": {
-                    "code": "FILE_TOO_LARGE",
-                    "message": "CSV file must be under 10 MB",
-                }
-            },
-        )
-
-    try:
-        text_content = raw.decode("utf-8-sig")  # handle BOM
-    except UnicodeDecodeError:
-        text_content = raw.decode("latin-1")
-
-    reader = csv.DictReader(io.StringIO(text_content))
-    if "text" not in (reader.fieldnames or []):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={
-                "error": {
-                    "code": "MISSING_TEXT_COLUMN",
-                    "message": "CSV must contain a 'text' column",
-                }
-            },
-        )
-
-    items: List[str] = []
-    for row in reader:
-        text = (row.get("text") or "").strip()
-        if text:
-            items.append(text)
-
-    if not items:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={
-                "error": {
-                    "code": "EMPTY_FILE",
-                    "message": "CSV contains no non-empty text rows",
-                }
-            },
-        )
-
-    if len(items) > 10000:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={
-                "error": {
-                    "code": "TOO_MANY_ITEMS",
-                    "message": f"CSV contains {len(items)} items (max 10,000)",
-                }
-            },
-        )
-
-    parsed_labels = None
-    if labels:
-        parsed_labels = [lbl.strip() for lbl in labels.split(",") if lbl.strip()]
-
-    # Create the job using the same logic as the JSON endpoint
-    now = datetime.now(timezone.utc).isoformat()
-    job_id = f"lbl_{uuid.uuid4().hex[:16]}"
-
-    job = {
-        "job_id": job_id,
-        "name": name,
-        "labeling_type": labeling_type.value,
-        "status": JobStatus.PENDING.value,
-        "total_items": len(items),
-        "created_at": now,
-        "updated_at": now,
-        "items_raw": items,
-        "labels": parsed_labels,
-        "num_agents": num_agents,
-        "consensus_threshold": consensus_threshold,
-        "instructions": instructions,
-        "results": None,
-        "quality_report": None,
-        "processing_time_s": None,
-    }
-
-    _labeling_jobs[job_id] = job
-    logger.info(
-        "Labeling job created from CSV: %s type=%s items=%d agents=%d",
-        job_id, labeling_type.value, len(items), num_agents,
+async def create_labeling_job_from_csv(request: Request):
+    """[已下线] CSV 批量标注创建入口已收敛：任务发布唯一入口为 POST /api/tasks。"""
+    raise HTTPException(
+        status_code=status.HTTP_410_GONE,
+        detail={
+            "error": {
+                "code": "ENDPOINT_RETIRED",
+                "message": "任务发布唯一入口为 POST /api/tasks（软件工程任务市场：自主竞价 + 3 专家评审 + 华币/NAU 奖励）",
+            }
+        },
     )
-
-    asyncio.create_task(_dispatch_labeling_job(job_id))
-
-    return _job_to_response(job)
 
 
 # ---------------------------------------------------------------------------

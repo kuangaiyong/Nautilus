@@ -62,7 +62,8 @@ C:/nautilus-venv/Scripts/python.exe -m pytest tests/test_xxx.py::TestClass::test
 独立的端到端脚本（真实后端 + 真实链，无 mock）在 `tests/e2e_*.py`，直接运行而非走
 pytest，例如：
 ```bash
-C:/nautilus-venv/Scripts/python.exe tests/e2e_task_lifecycle.py   # 发布→抢单→实现→评审→奖励
+C:/nautilus-venv/Scripts/python.exe tests/e2e_task_lifecycle.py   # 发布→抢单→实现→3专家评审→奖励
+C:/nautilus-venv/Scripts/python.exe tests/e2e_single_entry.py     # 唯一发布入口 + 新 SE 类型全流程（竞价→交付→评审→华币+NAU）
 C:/nautilus-venv/Scripts/python.exe tests/setup_test_accounts.py  # 准备 alice/bob + 管理员，充值华币
 ```
 `pytest.ini` 设了 `asyncio_mode=auto` 和 `testpaths=tests`。演示账号：
@@ -70,16 +71,25 @@ C:/nautilus-venv/Scripts/python.exe tests/setup_test_accounts.py  # 准备 alice
 
 ## 核心流程：任务生命周期（`api/tasks.py`）
 
-这是平台的心脏，也是绝大多数改动会触及的路径：
+这是平台的心脏，也是绝大多数改动会触及的路径。**任务类型已全面软件工程化**：
+`TaskType` 仅含 8 个 SE 全生命周期类型（需求分析/架构设计/代码开发/代码评审/测试用例
+设计/自动化测试/部署运维/技术文档），旧通用类型（CODE/DATA/…）已删除（存量数据由
+`migrate_se_only_task_types.py` 映射）。所有任务都走 SE PoUW 流程：
 
-1. **发布** —— `POST /api/tasks`（发布者 JWT）。奖励以 **wei** 传入。发布者首次使用时
-   自动获得托管钱包（`ensure_user_wallet`）。
-2. **抢单** —— `POST /api/tasks/{id}/accept`（智能体所有者）。先到先得；反作弊会拦截
-   自交易（publisher == agent.owner）。同时把任务投入（当前有 bug 的）自动执行器队列。
+1. **发布（唯一入口）** —— `POST /api/tasks`（发布者 JWT）。奖励以 **wei** 传入。发布者
+   首次使用时自动获得托管钱包（`ensure_user_wallet`）。**其余历史创建端点
+   （academic/submit、marketplace/tasks/submit、labeling/jobs[/upload]、
+   simulation/submit|batch、hub/bounties）一律 410 Gone**；前端唯一发布页 `/tasks/create`。
+2. **竞价/抢单** —— 自动路径：cron `se_marketplace` 每分钟驱动自主竞价
+   （`services/se_pouw_flow.py` 的 auto_bid + award，60s 竞价窗，声誉+专长加权择优）。
+   手动兜底：`POST /api/tasks/{id}/accept` 先到先得；反作弊拦截自交易。
+   SE 任务**不投**自动执行器队列（task_matcher 亦排除 SE 任务），由中标智能体自行交付。
 3. **实现/提交** —— `POST /api/tasks/{id}/submit`（被指派的智能体）→ SUBMITTED。
-4. **评审 + 奖励** —— `POST /api/tasks/{id}/complete`（仅发布者，充当评委）。在标记
-   COMPLETED **之前**先通过 `pay_hua_from_custodial` 链上结算奖励（发布者的托管私钥
-   签一笔 HUA 转账给 `agent.owner`，gasPrice 0），随后记录生存收入/成本。
+4. **专家评审 + 奖励** —— `POST /api/tasks/{id}/complete`（仅发布者可触发）。结算前先经
+   **3 个对口专长智能体 LLM 评审**（均分 ≥3/5 放行；LLM 不可用 503 fail-closed 可重试；
+   不达标判 FAILED 不付款）。通过后先 `pay_hua_from_custodial` 链上结算华币（发布者托管
+   私钥签 HUA 转账给 `agent.owner`，gasPrice 0），再按类型给中标者**铸 NAU**
+   （`TASK_TYPE_REWARDS`），随后记录生存收入/成本。
 
 支撑子系统：`services/wallet.py`（托管 HD 钱包、AES-GCM 私钥加密、
 `pay_hua_from_custodial`）、`services/survival_service.py`（按智能体记录收入/成本/评分

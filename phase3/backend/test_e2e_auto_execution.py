@@ -75,7 +75,7 @@ def fibonacci(n):
 print(fibonacci(10))
 """,
         reward=1000000000000000000,  # 1 ETH
-        task_type=TaskType.CODE,
+        task_type=TaskType.CODE_DEVELOPMENT,
         status=TaskStatus.ACCEPTED,  # Already accepted
         agent=user.wallet_address,
         timeout=300,

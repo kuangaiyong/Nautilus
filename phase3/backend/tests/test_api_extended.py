@@ -63,13 +63,13 @@ class TestTasksAPIExtended:
             input_data="input",
             expected_output="output",
             reward=1000,
-            task_type=TaskType.CODE,
+            task_type=TaskType.CODE_DEVELOPMENT,
             timeout=3600
         )
 
         assert task_data.description == "Test task"
         assert task_data.reward == 1000
-        assert task_data.task_type == TaskType.CODE
+        assert task_data.task_type == TaskType.CODE_DEVELOPMENT
         assert task_data.timeout == 3600
 
     def test_task_submit_model(self):
@@ -101,7 +101,7 @@ class TestTasksAPIExtended:
             input_data=None,
             expected_output=None,
             reward=100,
-            task_type=TaskType.CODE,
+            task_type=TaskType.CODE_DEVELOPMENT,
             status=TaskStatus.OPEN,
             agent=None,
             result=None,

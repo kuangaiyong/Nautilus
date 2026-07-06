@@ -88,7 +88,7 @@ def test_task(setup_database, test_user, test_agent):
         publisher=test_user.wallet_address,
         description="Test task",
         reward=10000000000000000,  # 0.01 ETH
-        task_type=TaskType.CODE,
+        task_type=TaskType.CODE_DEVELOPMENT,
         status=TaskStatus.SUBMITTED,
         agent=test_agent.owner,
         timeout=3600,

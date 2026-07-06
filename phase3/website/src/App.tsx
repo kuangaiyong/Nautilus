@@ -22,10 +22,8 @@ const BlogPage = lazy(() => import('./pages/BlogPage'))
 const RoadmapPage = lazy(() => import('./pages/RoadmapPage'))
 const CareersPage = lazy(() => import('./pages/CareersPage'))
 const ContactPage = lazy(() => import('./pages/ContactPage'))
-const TaskSubmit = lazy(() => import('./pages/TaskSubmit'))
 const TaskDetail = lazy(() => import('./pages/TaskDetail'))
 const OAuthCallback = lazy(() => import('./pages/OAuthCallback'))
-const AcademicTaskPage = lazy(() => import('./pages/AcademicTaskPage'))
 const AgentsPage = lazy(() => import('./pages/AgentsPage'))
 const AgentDetailPage = lazy(() => import('./pages/AgentDetailPage'))
 const LeaderboardPage = lazy(() => import('./pages/LeaderboardPage'))
@@ -67,10 +65,8 @@ function App() {
               <Route path="/roadmap" element={<RoadmapPage />} />
               <Route path="/careers" element={<CareersPage />} />
               <Route path="/contact" element={<ContactPage />} />
-              <Route path="/marketplace/submit" element={<TaskSubmit />} />
               <Route path="/marketplace/task/:taskId" element={<TaskDetail />} />
               <Route path="/auth/callback" element={<OAuthCallback />} />
-              <Route path="/academic" element={<AcademicTaskPage />} />
               <Route path="/agents" element={<AgentsPage />} />
               <Route path="/agents/:id" element={<AgentDetailPage />} />
               <Route path="/agents/:id/survival" element={<AgentSurvivalPage />} />

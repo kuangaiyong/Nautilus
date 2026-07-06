@@ -62,7 +62,7 @@ class TestModels:
             task_id="task-1",
             description="Test description",
             reward=100,
-            task_type=TaskType.CODE,
+            task_type=TaskType.CODE_DEVELOPMENT,
             status=TaskStatus.OPEN,
             publisher="0x123",
             agent=None,

@@ -1,13 +1,15 @@
-import { useState, useEffect, useCallback, type FormEvent } from 'react'
-import { tokenUtils } from '../utils/token'
+import { useState, useEffect, useCallback } from 'react'
 
-// 5 个软件工程任务类型（与后端 TaskType 对应）
+// 8 个软件工程任务类型（与后端 TaskType 对应，全生命周期）
 const SE_TYPE_LABELS: Record<string, string> = {
   REQUIREMENT_ANALYSIS: '需求分析',
   ARCHITECTURE_DESIGN: '架构设计',
+  CODE_DEVELOPMENT: '代码开发',
+  CODE_REVIEW: '代码评审',
   TEST_CASE_DESIGN: '测试用例设计',
   TEST_AUTOMATION: '自动化测试脚本',
-  CODE_DEVELOPMENT: '代码开发',
+  DEPLOYMENT_OPS: '部署运维',
+  DOCUMENTATION: '技术文档',
 }
 const SE_TYPES = Object.keys(SE_TYPE_LABELS)
 
@@ -32,12 +34,6 @@ interface Review {
 }
 interface ReviewResult { avg: number; passed: boolean; n: number; reviews: Review[] }
 
-// 华币 -> wei（BigInt 精确，支持小数），返回数字串供后端 int 解析
-function huaToWei(hua: string): string {
-  const [intPart, fracRaw = ''] = String(hua).trim().split('.')
-  const frac = (fracRaw + '0'.repeat(18)).slice(0, 18)
-  return (BigInt(intPart || '0') * 10n ** 18n + BigInt(frac || '0')).toString()
-}
 const weiToHua = (wei: number | string) => Number(wei) / 1e18
 
 export default function SeBoardPage() {
@@ -47,12 +43,6 @@ export default function SeBoardPage() {
   const [bids, setBids] = useState<Record<number, Bid[]>>({})
   const [reviews, setReviews] = useState<Record<number, ReviewResult>>({})
 
-  // 发布表单
-  const [form, setForm] = useState({ task_type: 'CODE_DEVELOPMENT', description: '', expected_output: '', reward: '10' })
-  const [submitting, setSubmitting] = useState(false)
-  const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
-  const token = tokenUtils.get()
-  const loggedIn = !!(token && tokenUtils.isValid(token))
 
   const fetchTasks = useCallback(async () => {
     setLoading(true)
@@ -78,35 +68,6 @@ export default function SeBoardPage() {
     }
   }
 
-  const publish = async (e: FormEvent) => {
-    e.preventDefault()
-    setMsg(null)
-    if (!form.description.trim()) { setMsg({ type: 'err', text: '请填写任务描述' }); return }
-    setSubmitting(true)
-    try {
-      const r = await fetch('/api/tasks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({
-          description: form.description,
-          expected_output: form.expected_output || undefined,
-          reward: huaToWei(form.reward || '0'),
-          task_type: form.task_type,
-          timeout: 86400,
-        }),
-      })
-      if (r.ok) {
-        setMsg({ type: 'ok', text: '发布成功，进入竞价中。智能体将自动竞价。' })
-        setForm(f => ({ ...f, description: '', expected_output: '' }))
-        fetchTasks()
-      } else {
-        const d = await r.json().catch(() => ({}))
-        setMsg({ type: 'err', text: `发布失败 (${r.status}): ${JSON.stringify(d.detail || d).slice(0, 160)}` })
-      }
-    } catch (err) { setMsg({ type: 'err', text: '网络错误，发布失败' }) }
-    finally { setSubmitting(false) }
-  }
-
   const scoreColor = (s: number) => s >= 4 ? 'text-green-400' : s >= 3 ? 'text-yellow-400' : 'text-red-400'
 
   return (
@@ -117,46 +78,13 @@ export default function SeBoardPage() {
           <p className="text-gray-300">软件工程 PoUW 市场：发布任务 · 智能体自主竞价 · 3 专家评审 · 完成铸 NAU</p>
         </div>
 
-        {/* 发布 SE 任务 */}
-        <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-xl p-6 mb-8">
-          <h2 className="text-xl font-bold text-white mb-4">📤 发布软件工程任务</h2>
-          {!loggedIn ? (
-            <p className="text-gray-300 text-sm">请先 <a href="/login" className="text-blue-300 underline">登录</a> 后发布任务。</p>
-          ) : (
-            <form onSubmit={publish} className="space-y-3">
-              <div className="grid sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs text-gray-400 mb-1">任务类型</label>
-                  <select value={form.task_type} onChange={e => setForm({ ...form, task_type: e.target.value })}
-                    className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm">
-                    {SE_TYPES.map(t => <option key={t} value={t} className="text-gray-900">{SE_TYPE_LABELS[t]}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs text-gray-400 mb-1">奖励（华币）</label>
-                  <input type="number" min="0" step="0.1" value={form.reward} onChange={e => setForm({ ...form, reward: e.target.value })}
-                    className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm" />
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs text-gray-400 mb-1">任务描述（需求/上下文）</label>
-                <textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} rows={3}
-                  placeholder="如：根据以下产品需求，实现下单接口并附 pytest 单测……"
-                  className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm placeholder-gray-500" />
-              </div>
-              <div>
-                <label className="block text-xs text-gray-400 mb-1">期望产出（验收标准，可选）</label>
-                <input value={form.expected_output} onChange={e => setForm({ ...form, expected_output: e.target.value })}
-                  placeholder="如：可运行且通过单测的代码"
-                  className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm placeholder-gray-500" />
-              </div>
-              {msg && <p className={`text-sm ${msg.type === 'ok' ? 'text-green-300' : 'text-red-300'}`}>{msg.text}</p>}
-              <button type="submit" disabled={submitting}
-                className="px-5 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded-lg text-sm transition">
-                {submitting ? '发布中…' : '发布任务（进入竞价）'}
-              </button>
-            </form>
-          )}
+        {/* 发布入口统一收敛到 /tasks/create（全平台唯一发布页） */}
+        <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-xl p-6 mb-8 flex items-center justify-between gap-4">
+          <p className="text-gray-300 text-sm">发布软件工程任务后，智能体将自主竞价，中标交付经 3 专家评审后发放华币 + NAU 奖励。</p>
+          <a href="/tasks/create"
+            className="shrink-0 px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm transition">
+            📤 发布任务
+          </a>
         </div>
 
         {/* SE 任务列表 */}

@@ -220,7 +220,7 @@ class TestMigrations:
                 publisher="0x1234567890123456789012345678901234567890",
                 description="Test task",
                 reward=1000000000000000000,
-                task_type=TaskType.CODE,
+                task_type=TaskType.CODE_DEVELOPMENT,
                 status=TaskStatus.OPEN,
                 timeout=3600,
                 created_at=datetime.now(timezone.utc)

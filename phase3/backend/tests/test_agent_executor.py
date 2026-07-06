@@ -25,7 +25,7 @@ def sample_task(db: Session):
         description="Test task: Calculate fibonacci(10)",
         requirements="Write a Python function to calculate fibonacci numbers",
         reward=1000000000000000000,  # 1 ETH
-        task_type=TaskType.CODE,
+        task_type=TaskType.CODE_DEVELOPMENT,
         status=TaskStatus.ACCEPTED,
         timeout=300
     )
@@ -168,7 +168,7 @@ async def test_execute_task_by_agent_wrong_status(db: Session, sample_agent):
         publisher="0x1234567890123456789012345678901234567890",
         description="Test task",
         reward=1000000000000000000,
-        task_type=TaskType.CODE,
+        task_type=TaskType.CODE_DEVELOPMENT,
         status=TaskStatus.OPEN,  # Wrong status
         timeout=300
     )
@@ -195,7 +195,7 @@ async def test_concurrent_task_execution(db: Session, sample_agent):
             description=f"Test task {i}",
             requirements="Simple task",
             reward=1000000000000000000,
-            task_type=TaskType.CODE,
+            task_type=TaskType.CODE_DEVELOPMENT,
             status=TaskStatus.ACCEPTED,
             timeout=300
         )

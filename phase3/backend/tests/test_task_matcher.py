@@ -12,6 +12,9 @@ from task_matcher import calculate_agent_score
 MIN_SCORE = 50.0  # auto_assign_task 的默认门槛
 
 
+# 注：撮合评分测试沿用遗留非 SE 类型字符串（"CODE"）。TaskType 枚举已全面 SE 化，
+# check_and_assign_tasks 会排除全部 SE 任务；calculate_agent_score 仅对遗留存量
+# 任务有意义，其 TASK_TYPE_SKILLS 词表仍以旧类型为键，故此处保留 "CODE"。
 def _task(task_type="CODE"):
     return SimpleNamespace(task_type=task_type)
 
@@ -52,3 +55,42 @@ def test_reputation_contributes_meaningfully():
     low = calculate_agent_score(_task("CODE"), _agent("painting", reputation=0))
     base = calculate_agent_score(_task("CODE"), _agent("painting", reputation=100))
     assert base - low >= 10, f"信誉 100 应显著贡献分数，实际差 {base - low}"
+
+
+# ---------------------------------------------------------------------------
+# 任务类型全面 SE 化：自动撮合必须排除 SE 任务（防抢跑 60s 竞价窗、
+# 防把 SE 任务投进自动执行队列）。SE 派单唯一自动路径 = se_marketplace 竞价 cron。
+# ---------------------------------------------------------------------------
+
+def test_all_task_types_are_se():
+    """TaskType 8 类全部被 is_se_task 认定（自动撮合对新任务恒 no-op 的前提）。"""
+    from models.database import TaskType
+    from services import se_pouw
+
+    assert len(TaskType) == 8
+    for t in TaskType:
+        assert se_pouw.is_se_task(t), f"{t.name} 应为 SE 任务类型"
+    assert not se_pouw.is_se_task("CODE")  # 遗留类型不算 SE
+
+
+async def test_check_and_assign_skips_se_tasks(monkeypatch):
+    """check_and_assign_tasks 对 OPEN 的 SE 任务不调用 auto_assign_task。"""
+    from unittest.mock import MagicMock
+    import task_matcher
+
+    se_task = SimpleNamespace(id=101, task_type="CODE_DEVELOPMENT")
+    legacy_task = SimpleNamespace(id=102, task_type="CODE")
+    db = MagicMock()
+    db.query.return_value.filter.return_value.all.return_value = [se_task, legacy_task]
+
+    assigned = []
+
+    async def fake_assign(task_id, _db, min_score=50.0):
+        assigned.append(task_id)
+        return None
+
+    monkeypatch.setattr(task_matcher, "auto_assign_task", fake_assign)
+    await task_matcher.check_and_assign_tasks(db)
+
+    assert 101 not in assigned, "SE 任务不得被自动撮合派单"
+    assert assigned == [102], "遗留非 SE 任务仍走自动撮合"

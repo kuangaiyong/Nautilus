@@ -75,7 +75,7 @@ class TestTasksAPIComplete:
         app.dependency_overrides[get_db] = override_get_db
 
         client = TestClient(app)
-        response = client.get("/tasks/?task_type=CODE")
+        response = client.get("/tasks/?task_type=CODE_DEVELOPMENT")
 
         assert response.status_code in [200, 307]
 

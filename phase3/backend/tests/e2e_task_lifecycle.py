@@ -135,7 +135,7 @@ def main():
         "description": "实现一个字符串反转函数 reverse(s)，并附带 pytest 单测",
         "input_data": "函数签名 def reverse(s: str) -> str",
         "expected_output": "通过单测的实现代码",
-        "reward": REWARD_HUA * ONE, "task_type": "CODE", "timeout": 86400})
+        "reward": REWARD_HUA * ONE, "task_type": "CODE_DEVELOPMENT", "timeout": 86400})
     need(r.status_code == 201, f"创建任务 HTTP {r.status_code}")
     task = r.json()
     TID = task["id"]
@@ -173,7 +173,9 @@ def main():
     need(db_one("SELECT status FROM tasks WHERE id=?", (TID,))["status"] == "SUBMITTED", "任务状态 = SUBMITTED")
 
     # ---- 5. 评审 + 奖励 ----
-    step("5. 评委(发布者 alice)评审通过 -> 链上华币奖励结算")
+    # 任务类型全面 SE 化后，complete 端点在结算前同步执行 3 专家 LLM 评审
+    # （均分 ≥3/5 放行；LLM 网关不可用时 503 fail-closed 可重试）。
+    step("5. 发布者触发完成 -> 3 专家评审通过 -> 链上华币奖励结算")
     win_addr = agents[WIN]["owner"]
     a0, w0 = bal(pub["address"]), bal(win_addr)
     inc0 = (db_one("SELECT total_income FROM agent_survival WHERE agent_id=?", (agents[WIN]["agent_id"],)) or {"total_income": 0})["total_income"] or 0

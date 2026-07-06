@@ -19,7 +19,6 @@ from datetime import datetime, timezone
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 import asyncio
-import uuid
 import json
 import logging
 import os
@@ -65,48 +64,6 @@ class SimulationStatus(str, Enum):
 # Request / Response schemas
 # ---------------------------------------------------------------------------
 
-class CreateSimulationRequest(BaseModel):
-    """Request to submit a new simulation task."""
-    title: str = Field(..., min_length=1, max_length=200)
-    simulation_type: SimulationType
-    description: str = Field(..., min_length=1, max_length=5000)
-    parameters: Optional[Dict[str, Any]] = Field(
-        None,
-        description="Physics params, initial conditions, solver settings",
-    )
-    num_episodes: int = Field(default=1, ge=1, le=1000)
-    time_steps: int = Field(default=100, ge=10, le=100000)
-    output_format: str = Field(
-        default="json",
-        description="Desired output format: json, csv, or numpy",
-    )
-
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "title": "Double pendulum chaos simulation",
-                "simulation_type": "physics_simulation",
-                "description": (
-                    "Simulate a double pendulum with m1=m2=1kg, l1=l2=1m. "
-                    "Initial angles: theta1=120deg, theta2=-10deg. "
-                    "Output position traces for 20 seconds."
-                ),
-                "parameters": {
-                    "m1": 1.0,
-                    "m2": 1.0,
-                    "l1": 1.0,
-                    "l2": 1.0,
-                    "theta1_deg": 120.0,
-                    "theta2_deg": -10.0,
-                    "gravity": 9.81,
-                },
-                "num_episodes": 1,
-                "time_steps": 2000,
-                "output_format": "json",
-            }
-        }
-
-
 class SimulationResult(BaseModel):
     """Result from an executed simulation task."""
     code: Optional[str] = Field(None, description="Generated Python code")
@@ -142,19 +99,6 @@ class SimulationTaskListResponse(BaseModel):
     total: int
     page: int
     limit: int
-
-
-class BatchSimulationRequest(BaseModel):
-    """Submit multiple simulation scenarios in one call."""
-    scenarios: List[CreateSimulationRequest] = Field(
-        ..., min_length=1, max_length=50,
-    )
-
-
-class BatchSimulationResponse(BaseModel):
-    """Response for a batch submission."""
-    submitted: int
-    task_ids: List[str]
 
 
 class SimulationCapability(BaseModel):
@@ -220,59 +164,19 @@ def _model_to_response(row: SimulationTaskModel) -> SimulationTaskResponse:
 # Endpoints
 # ---------------------------------------------------------------------------
 
-@router.post(
-    "/submit",
-    response_model=SimulationTaskResponse,
-    status_code=status.HTTP_201_CREATED,
-)
+@router.post("/submit")
 @limiter.limit("10/minute")
-async def submit_simulation(
-    request: Request,
-    task_data: CreateSimulationRequest,
-    db: Session = Depends(get_db),
-):
-    """
-    Submit a simulation task for execution.
-
-    Accepts physics simulations, motion planning, sensor generation,
-    and other embodied-AI training workloads. The task is queued for
-    execution by the CodeExecutor service with simulation-specific
-    templates.
-
-    **Rate Limit**: 10 requests per minute
-    """
-    task_id = f"sim_{uuid.uuid4().hex[:16]}"
-    now = datetime.utcnow()
-
-    row = SimulationTaskModel(
-        task_id=task_id,
-        title=task_data.title,
-        description=task_data.description,
-        simulation_type=task_data.simulation_type.value,
-        status=SimulationStatus.PENDING.value,
-        parameters=(
-            json.dumps(task_data.parameters)
-            if task_data.parameters
-            else None
-        ),
-        num_episodes=task_data.num_episodes,
-        time_steps=task_data.time_steps,
-        output_format=task_data.output_format,
-        created_at=now,
-        updated_at=now,
+async def submit_simulation(request: Request):
+    """[已下线] 仿真任务创建入口已收敛：任务发布唯一入口为 POST /api/tasks。"""
+    raise HTTPException(
+        status_code=status.HTTP_410_GONE,
+        detail={
+            "error": {
+                "code": "ENDPOINT_RETIRED",
+                "message": "任务发布唯一入口为 POST /api/tasks（软件工程任务市场：自主竞价 + 3 专家评审 + 华币/NAU 奖励）",
+            }
+        },
     )
-
-    db.add(row)
-    db.commit()
-    db.refresh(row)
-
-    logger.info(
-        "Simulation task submitted: %s type=%s episodes=%d",
-        task_id, task_data.simulation_type.value, task_data.num_episodes,
-    )
-
-    asyncio.create_task(_dispatch_simulation_task(task_id))
-    return _model_to_response(row)
 
 
 @router.get("/{task_id}", response_model=SimulationTaskResponse)
@@ -372,56 +276,18 @@ async def list_capabilities(request: Request):
     return capabilities
 
 
-@router.post("/batch", response_model=BatchSimulationResponse)
+@router.post("/batch")
 @limiter.limit("5/minute")
-async def submit_batch(
-    request: Request,
-    batch: BatchSimulationRequest,
-    db: Session = Depends(get_db),
-):
-    """
-    Submit a batch of simulation scenarios.
-
-    Up to 50 scenarios per request. Each scenario is queued
-    independently and receives its own task_id.
-
-    **Rate Limit**: 5 requests per minute
-    """
-    task_ids: List[str] = []
-    now = datetime.utcnow()
-
-    for scenario in batch.scenarios:
-        task_id = f"sim_{uuid.uuid4().hex[:16]}"
-        row = SimulationTaskModel(
-            task_id=task_id,
-            title=scenario.title,
-            description=scenario.description,
-            simulation_type=scenario.simulation_type.value,
-            status=SimulationStatus.PENDING.value,
-            parameters=(
-                json.dumps(scenario.parameters)
-                if scenario.parameters
-                else None
-            ),
-            num_episodes=scenario.num_episodes,
-            time_steps=scenario.time_steps,
-            output_format=scenario.output_format,
-            created_at=now,
-            updated_at=now,
-        )
-        db.add(row)
-        task_ids.append(task_id)
-
-    db.commit()
-
-    logger.info("Batch simulation submitted: %d scenarios", len(task_ids))
-
-    for tid in task_ids:
-        asyncio.create_task(_dispatch_simulation_task(tid))
-
-    return BatchSimulationResponse(
-        submitted=len(task_ids),
-        task_ids=task_ids,
+async def submit_batch(request: Request):
+    """[已下线] 批量仿真创建入口已收敛：任务发布唯一入口为 POST /api/tasks。"""
+    raise HTTPException(
+        status_code=status.HTTP_410_GONE,
+        detail={
+            "error": {
+                "code": "ENDPOINT_RETIRED",
+                "message": "任务发布唯一入口为 POST /api/tasks（软件工程任务市场：自主竞价 + 3 专家评审 + 华币/NAU 奖励）",
+            }
+        },
     )
 
 

@@ -127,7 +127,7 @@ def main():
     rt = requests.post(f"{API}/api/tasks", headers=auth(tv), json={
         "description": "内网验证任务：实现两数相加并附单测",
         "input_data": "两个整数", "expected_output": "它们的和",
-        "reward": ONE, "task_type": "CODE", "timeout": 86400})
+        "reward": ONE, "task_type": "CODE_DEVELOPMENT", "timeout": 86400})
     res["task publish"] = f"HTTP {rt.status_code} ({'OK' if rt.status_code == 201 else rt.text[:120]})"
 
     ra = requests.post(f"{API}/api/agents", headers=auth(tv), json={

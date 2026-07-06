@@ -19,16 +19,20 @@ class TestDatabaseModels:
     """测试数据库模型"""
 
     def test_task_type_enum(self):
-        """测试TaskType枚举"""
+        """测试TaskType枚举（软件工程全生命周期 8 类，旧通用类型已下线）"""
         from models.database import TaskType
 
-        assert TaskType.CODE.value == "CODE"
-        assert TaskType.DATA.value == "DATA"
-        assert TaskType.COMPUTE.value == "COMPUTE"
-        assert TaskType.RESEARCH.value == "RESEARCH"
-        assert TaskType.DESIGN.value == "DESIGN"
-        assert TaskType.WRITING.value == "WRITING"
-        assert TaskType.OTHER.value == "OTHER"
+        assert TaskType.REQUIREMENT_ANALYSIS.value == "REQUIREMENT_ANALYSIS"
+        assert TaskType.ARCHITECTURE_DESIGN.value == "ARCHITECTURE_DESIGN"
+        assert TaskType.CODE_DEVELOPMENT.value == "CODE_DEVELOPMENT"
+        assert TaskType.CODE_REVIEW.value == "CODE_REVIEW"
+        assert TaskType.TEST_CASE_DESIGN.value == "TEST_CASE_DESIGN"
+        assert TaskType.TEST_AUTOMATION.value == "TEST_AUTOMATION"
+        assert TaskType.DEPLOYMENT_OPS.value == "DEPLOYMENT_OPS"
+        assert TaskType.DOCUMENTATION.value == "DOCUMENTATION"
+        # 恰好 8 类，且不含任何旧通用类型
+        assert len(TaskType) == 8
+        assert not {"CODE", "DATA", "COMPUTE", "RESEARCH", "DESIGN", "WRITING", "OTHER"} & {t.name for t in TaskType}
 
     def test_task_status_enum(self):
         """测试TaskStatus枚举"""
@@ -87,7 +91,7 @@ class TestDatabaseModels:
             task_id="task-1",
             description="Test description",
             reward=100,
-            task_type=TaskType.CODE,
+            task_type=TaskType.CODE_DEVELOPMENT,
             status=TaskStatus.OPEN,
             publisher="0x123",
             agent=None,
@@ -97,7 +101,7 @@ class TestDatabaseModels:
         assert task.task_id == "task-1"
         assert task.description == "Test description"
         assert task.reward == 100
-        assert task.task_type == TaskType.CODE
+        assert task.task_type == TaskType.CODE_DEVELOPMENT
         assert task.status == TaskStatus.OPEN
         assert task.publisher == "0x123"
         assert task.timeout == 3600

@@ -84,7 +84,7 @@ def setup_test_data():
             publisher=user.wallet_address,
             description=f"Benchmark task {i}",
             reward=1000000000000000000,
-            task_type=TaskType.CODE,
+            task_type=TaskType.CODE_DEVELOPMENT,
             status=TaskStatus.OPEN if i % 3 == 0 else TaskStatus.COMPLETED,
             timeout=3600,
             created_at=datetime.now(timezone.utc)

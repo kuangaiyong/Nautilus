@@ -147,7 +147,7 @@ class TestTasksE2E:
             json={
                 "description": "Test task",
                 "reward": 1000,
-                "task_type": "CODE",
+                "task_type": "CODE_DEVELOPMENT",
                 "timeout": 3600
             },
             headers={"Authorization": f"Bearer {auth_token}"}
@@ -166,7 +166,7 @@ class TestTasksE2E:
             json={
                 "description": "Test task",
                 "reward": 1000,
-                "task_type": "CODE",
+                "task_type": "CODE_DEVELOPMENT",
                 "timeout": 3600
             }
         )
@@ -181,7 +181,7 @@ class TestTasksE2E:
                 json={
                     "description": f"Task {i}",
                     "reward": 1000 + i * 100,
-                    "task_type": "CODE",
+                    "task_type": "CODE_DEVELOPMENT",
                     "timeout": 3600
                 },
                 headers={"Authorization": f"Bearer {auth_token}"}
@@ -201,7 +201,7 @@ class TestTasksE2E:
             json={
                 "description": "Code task",
                 "reward": 1000,
-                "task_type": "CODE",
+                "task_type": "CODE_DEVELOPMENT",
                 "timeout": 3600
             },
             headers={"Authorization": f"Bearer {auth_token}"}
@@ -212,17 +212,17 @@ class TestTasksE2E:
             json={
                 "description": "Data task",
                 "reward": 2000,
-                "task_type": "DATA",
+                "task_type": "DOCUMENTATION",
                 "timeout": 3600
             },
             headers={"Authorization": f"Bearer {auth_token}"}
         )
 
-        # 过滤CODE类型
-        response = client.get("/api/tasks?task_type=CODE")
+        # 过滤 CODE_DEVELOPMENT 类型
+        response = client.get("/api/tasks?task_type=CODE_DEVELOPMENT")
         assert response.status_code == 200
         data = response.json()
-        assert all(task["task_type"] == "CODE" for task in data)
+        assert all(task["task_type"] == "CODE_DEVELOPMENT" for task in data)
 
     def test_get_task_by_id(self, client, auth_token):
         """测试获取单个任务"""
@@ -232,7 +232,7 @@ class TestTasksE2E:
             json={
                 "description": "Test task",
                 "reward": 1000,
-                "task_type": "CODE",
+                "task_type": "CODE_DEVELOPMENT",
                 "timeout": 3600
             },
             headers={"Authorization": f"Bearer {auth_token}"}
@@ -261,7 +261,7 @@ class TestTasksE2E:
             task_id="0x1234",
             description="Test task",
             reward=1000,
-            task_type=TaskType.CODE,
+            task_type=TaskType.CODE_DEVELOPMENT,
             status=TaskStatus.OPEN,
             publisher="0x1234567890123456789012345678901234567890",
             timeout=3600
@@ -300,7 +300,7 @@ class TestTasksE2E:
             task_id="0x1235",
             description="Test task",
             reward=1000,
-            task_type=TaskType.CODE,
+            task_type=TaskType.CODE_DEVELOPMENT,
             status=TaskStatus.ACCEPTED,
             publisher="0x1234567890123456789012345678901234567890",
             agent=agent_wallet,
@@ -328,7 +328,7 @@ class TestTasksE2E:
             task_id="0x1236",
             description="Test task",
             reward=1000,
-            task_type=TaskType.CODE,
+            task_type=TaskType.CODE_DEVELOPMENT,
             status=TaskStatus.ACCEPTED,
             publisher="0x1234567890123456789012345678901234567890",
             agent=agent_wallet,
@@ -360,7 +360,7 @@ class TestTasksE2E:
             task_id="0x1237",
             description="Test task",
             reward=1000,
-            task_type=TaskType.CODE,
+            task_type=TaskType.CODE_DEVELOPMENT,
             status=TaskStatus.OPEN,
             publisher="0x1234567890123456789012345678901234567890",
             timeout=3600
@@ -388,7 +388,7 @@ class TestTasksE2E:
             task_id="0x1238",
             description="Test task",
             reward=1000,
-            task_type=TaskType.CODE,
+            task_type=TaskType.CODE_DEVELOPMENT,
             status=TaskStatus.ACCEPTED,
             publisher="0x1234567890123456789012345678901234567890",
             agent="0x9999999999999999999999999999999999999999",
@@ -417,7 +417,7 @@ class TestTasksE2E:
             task_id="0x1241",
             description="Test task",
             reward=1000,
-            task_type=TaskType.CODE,
+            task_type=TaskType.CODE_DEVELOPMENT,
             status=TaskStatus.FAILED,
             publisher="0x1234567890123456789012345678901234567890",
             agent=agent_wallet,

@@ -103,7 +103,7 @@ class TestCompleteTaskWorkflow:
             json={
                 "description": "Workflow test task",
                 "reward": 1000000000000000000,  # 1 ETH
-                "task_type": "CODE",
+                "task_type": "CODE_DEVELOPMENT",
                 "timeout": 3600
             },
             headers={"Authorization": f"Bearer {publisher_token}"}
@@ -172,7 +172,7 @@ class TestMultiAgentWorkflow:
             json={
                 "description": "Competitive task",
                 "reward": 2000000000000000000,  # 2 ETH
-                "task_type": "CODE",
+                "task_type": "CODE_DEVELOPMENT",
                 "timeout": 3600
             },
             headers={"Authorization": f"Bearer {publisher_token}"}
@@ -243,7 +243,7 @@ class TestErrorHandlingWorkflow:
             json={
                 "description": "Protected task",
                 "reward": 1000000000000000000,
-                "task_type": "CODE",
+                "task_type": "CODE_DEVELOPMENT",
                 "timeout": 3600
             },
             headers={"Authorization": f"Bearer {publisher_token}"}
@@ -337,7 +337,7 @@ class TestAgentReputationWorkflow:
             json={
                 "description": "Reputation test task",
                 "reward": 1000000000000000000,
-                "task_type": "CODE",
+                "task_type": "CODE_DEVELOPMENT",
                 "timeout": 3600
             },
             headers={"Authorization": f"Bearer {publisher_token}"}
@@ -390,7 +390,7 @@ class TestConcurrentOperations:
                 json={
                     "description": f"Concurrent task {i}",
                     "reward": 1000000000000000000,
-                    "task_type": "CODE",
+                    "task_type": "CODE_DEVELOPMENT",
                     "timeout": 3600
                 },
                 headers={"Authorization": f"Bearer {publisher_token}"}

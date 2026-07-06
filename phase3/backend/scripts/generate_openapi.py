@@ -106,7 +106,7 @@ tasks_api = TasksApi(client)
 task = tasks_api.create_task({
     "description": "开发任务",
     "reward": 1000000000000000000,
-    "task_type": "CODE",
+    "task_type": "CODE_DEVELOPMENT",
     "timeout": 86400
 })
 print(f"任务已创建: {task.task_id}")
@@ -130,7 +130,7 @@ const tasksApi = new TasksApi(config);
 const task = await tasksApi.createTask({
   description: '开发任务',
   reward: '1000000000000000000',
-  task_type: 'CODE',
+  task_type: 'CODE_DEVELOPMENT',
   timeout: 86400
 });
 console.log(`任务已创建: ${task.task_id}`);

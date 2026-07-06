@@ -258,6 +258,13 @@ async def check_and_assign_tasks(db: Session):
             Task.status == TaskStatus.OPEN
         ).all()
 
+        # 软件工程(SE)任务由 se_marketplace cron 的自主竞价择优派单（60s 竞价窗），
+        # 自动撮合不得抢跑，也绝不能把 SE 任务投进自动执行队列（旧执行器会对 SE
+        # 类型反复 planning/executing 死循环并争用 LLM 网关）。任务类型全面 SE 化后
+        # 此轮询实质 no-op，保留以兼容任何遗留非 SE 存量任务。
+        from services import se_pouw
+        open_tasks = [t for t in open_tasks if not se_pouw.is_se_task(t.task_type)]
+
         if not open_tasks:
             logger.info("No open tasks found")
             return

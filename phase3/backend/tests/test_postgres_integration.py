@@ -188,7 +188,7 @@ class TestTasksAPIIntegration:
                 json={
                     "description": "Test task",
                     "reward": 1000,
-                    "task_type": "CODE",
+                    "task_type": "CODE_DEVELOPMENT",
                     "timeout": 3600
                 },
                 headers={"Authorization": f"Bearer {token}"}
@@ -203,7 +203,7 @@ class TestTasksAPIIntegration:
 
     def test_list_tasks_with_filters(self, client):
         """测试带过滤器的任务列表"""
-        response = client.get("/api/tasks?status=Open&task_type=CODE")
+        response = client.get("/api/tasks?status=OPEN&task_type=CODE_DEVELOPMENT")
         assert response.status_code == 200
 
 

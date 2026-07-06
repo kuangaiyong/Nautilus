@@ -1,9 +1,9 @@
 """链上可信追踪端到端测试（方案 A-ii，私有链，无 mock）：
 
-  alice 发布 CODE 任务
-    -> 智能体抢单（HTTP 优先，赶在自动匹配前；被自动匹配抢到则顺应）—— ACCEPT 存证
-    -> 自动执行器执行并提交结果 —— SUBMIT 存证
-    -> 发布者 alice 完成 -> 链上华币结算 —— COMPLETE 存证
+  alice 发布 CODE_DEVELOPMENT 任务（任务类型已全面 SE 化）
+    -> 智能体抢单（先到先得；SE 任务不走自动撮合/自动执行器）—— ACCEPT 存证
+    -> 中标智能体自行提交交付物 —— SUBMIT 存证
+    -> 发布者 alice 完成 -> 3 专家评审 -> 链上华币结算 —— COMPLETE 存证
   每个动作由动作主体的托管钱包亲自向 TaskAuditTrail 合约存证（A-ii，msg.sender=主体）。
   存证走后台线程异步落链，E2E 轮询等 confirmed。
 
@@ -136,38 +136,38 @@ def main():
     step("1. alice 发布 CODE 任务")
     r = requests.post(f"{API}/api/tasks", headers=auth(PUBLISHER), json={
         "description": "实现 reverse(s) 并附 pytest 单测", "input_data": "def reverse(s: str) -> str",
-        "expected_output": "通过单测的实现", "reward": REWARD_HUA * ONE, "task_type": "CODE", "timeout": 86400})
+        "expected_output": "通过单测的实现", "reward": REWARD_HUA * ONE, "task_type": "CODE_DEVELOPMENT", "timeout": 86400})
     need(r.status_code == 201, f"创建任务 HTTP {r.status_code}")
     TID = r.json()["id"]
     info(f"task.id={TID}")
 
-    # ---- 2. 抢单（HTTP 优先，赶在自动匹配前；被自动抢到则顺应）----
+    # ---- 2. 抢单（先到先得；SE 任务不会被自动撮合抢先）----
     step("2. 智能体抢单 -> ACCEPT 存证")
     codes = {u: requests.post(f"{API}/api/tasks/{TID}/accept", headers=auth(u)).status_code for u in OWNERS}
     winners = [u for u, c in codes.items() if c == 200]
-    if winners:
-        info(f"HTTP 抢单胜出={winners[0]} codes={codes}")
-    else:
-        info(f"HTTP 抢单均失败（被自动匹配抢先），顺应自动路径 codes={codes}")
-        poll(lambda: task_row(TID), lambda t: t.get("status") in ("ACCEPTED", "SUBMITTED"), timeout=60)
+    need(len(winners) == 1, f"恰好一个智能体抢到任务 codes={codes}")
+    WIN_USER = winners[0]
     t2 = task_row(TID)
-    need(t2.get("status") in ("ACCEPTED", "SUBMITTED"), f"任务已被抢: status={t2.get('status')}")
+    need(t2.get("status") == "ACCEPTED", f"任务已被抢: status={t2.get('status')}")
     win_addr = (t2.get("agent") or "").lower()
-    info(f"中标智能体 owner={win_addr}")
+    info(f"中标智能体 owner={win_addr} (user={WIN_USER})")
     poll(lambda: recorded_actions(TID), lambda s: "ACCEPT" in s, timeout=60)
-    need("ACCEPT" in recorded_actions(TID), "ACCEPT 存证 confirmed（HTTP 或自动路径）")
+    need("ACCEPT" in recorded_actions(TID), "ACCEPT 存证 confirmed")
 
-    # ---- 3. 自动执行器提交 ----
-    step("3. 自动执行器执行并提交结果 -> SUBMIT 存证")
-    poll(lambda: task_row(TID), lambda t: t.get("status") == "SUBMITTED", timeout=180)
-    need(task_row(TID).get("status") == "SUBMITTED", "任务状态 = SUBMITTED（自动执行器已提交）")
+    # ---- 3. 中标智能体自行提交（SE 任务不走自动执行器）----
+    step("3. 中标智能体提交交付物 -> SUBMIT 存证")
+    deliverable = ("def reverse(s: str) -> str:\n    return s[::-1]\n\n"
+                   "# pytest 单测\nassert reverse('abc') == 'cba'\nassert reverse('') == ''")
+    rs = requests.post(f"{API}/api/tasks/{TID}/submit", headers=auth(WIN_USER), json={"result": deliverable})
+    need(rs.status_code == 200, f"提交交付物 HTTP {rs.status_code}")
+    need(task_row(TID).get("status") == "SUBMITTED", "任务状态 = SUBMITTED")
     poll(lambda: recorded_actions(TID), lambda s: "SUBMIT" in s, timeout=60)
     need("SUBMIT" in recorded_actions(TID), "SUBMIT 存证 confirmed")
 
-    # ---- 4. 完成 + 结算 ----
-    step("4. alice 完成 -> COMPLETE 存证 + 华币结算")
+    # ---- 4. 完成（3 专家评审门控）+ 结算 ----
+    step("4. alice 完成 -> 3 专家评审 -> COMPLETE 存证 + 华币结算")
     a0, w0 = bal(pub_addr), bal(win_addr)
-    rc = requests.post(f"{API}/api/tasks/{TID}/complete", headers=auth(PUBLISHER))
+    rc = requests.post(f"{API}/api/tasks/{TID}/complete", headers=auth(PUBLISHER), timeout=180)
     need(rc.status_code == 200, f"完成 HTTP {rc.status_code} {'' if rc.status_code==200 else rc.text[:160]}")
     poll(lambda: recorded_actions(TID), lambda s: "COMPLETE" in s, timeout=90)
     need("COMPLETE" in recorded_actions(TID), "COMPLETE 存证已上链（confirmed/sent）")
