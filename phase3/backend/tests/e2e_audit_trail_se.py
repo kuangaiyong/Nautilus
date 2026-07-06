@@ -188,6 +188,10 @@ def main():
             at._bg_executor.shutdown(wait=True)
         except Exception:
             pass
+        # 复位第 0 步临时抬高的竞价者声誉/自主开关（schema 默认值），避免残留污染真实市场的
+        # 竞价加权(bid_weight)与评审人选取(select_reviewers 按声誉降序)。
+        for _a in bidder_addrs.values():
+            db_exec("UPDATE agents SET autonomy_enabled=0, reputation_score=50.0 WHERE lower(owner)=:a", {"a": _a})
         if tid is not None:
             db.query(TaskReview).filter(TaskReview.task_id == tid).delete()
             from models.database import DmasTaskBid, AuditLog
