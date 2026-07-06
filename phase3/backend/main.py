@@ -171,7 +171,7 @@ async def lifespan(app: FastAPI):
     logger.info("Database pool monitoring initialized")
 
     # Initialize monitoring
-    initialize_app_info(version="3.3.0", environment=ENVIRONMENT)
+    initialize_app_info(version="3.3.1", environment=ENVIRONMENT)
     logger.info("Monitoring system initialized")
 
     # Initialize cache cleanup task
@@ -415,7 +415,7 @@ app = FastAPI(
     - GitHub: https://github.com/nautilus-project
     - Discord: https://discord.gg/nautilus
     """,
-    version="3.3.0",
+    version="3.3.1",
     lifespan=lifespan,
     debug=DEBUG,
     docs_url="/api/docs",
