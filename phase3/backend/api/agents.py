@@ -594,27 +594,34 @@ async def get_agent_nau_history(
             detail="Agent not found"
         )
 
+    # NAU 奖励发放于 SE PoUW 常规 Task 表（agent 为执行者、评审通过完成后铸 NAU）；
+    # 旧 AcademicTask 路径已弃用（存量为空），故此前 SE 智能体的 NAU 历史恒为空。
+    # 每类型 NAU 额度见 TASK_TYPE_REWARDS；tx 用该任务链上结算/完成交易作为链上参照。
+    from services.nautilus_token import TASK_TYPE_REWARDS
+    from services import se_pouw
+
     rows = (
-        db.query(AcademicTask)
+        db.query(Task)
         .filter(
-            AcademicTask.assigned_agent_id == agent_id,
-            AcademicTask.status == "completed",
-            AcademicTask.blockchain_tx_hash.isnot(None),
+            Task.agent == agent.owner,
+            Task.status == TaskStatus.COMPLETED,
+            Task.completed_at.isnot(None),
         )
-        .order_by(AcademicTask.updated_at.desc())
+        .order_by(Task.completed_at.desc())
         .limit(50)
         .all()
     )
 
     return [
         {
-            "task_id": r.task_id,
-            "task_type": r.task_type,
-            "token_reward": r.token_reward,
-            "blockchain_tx_hash": r.blockchain_tx_hash,
-            "completed_at": r.updated_at.isoformat() if r.updated_at else None,
+            "task_id": t.task_id,
+            "task_type": se_pouw._norm(t.task_type),
+            "token_reward": TASK_TYPE_REWARDS.get(se_pouw._norm(t.task_type), 1),
+            "blockchain_tx_hash": t.blockchain_complete_tx,
+            "completed_at": t.completed_at.isoformat() if t.completed_at else None,
         }
-        for r in rows
+        for t in rows
+        if se_pouw.is_se_task(t.task_type)
     ]
 
 

@@ -95,7 +95,7 @@ export default function AgentSurvivalPage() {
 
       <div className={`rounded-lg p-6 mb-6 border-2 ${getLevelColor(data.level)}`}>
         <h2 className="text-2xl font-bold mb-2">生存等级: {data.level}</h2>
-        <p className="text-lg">综合评分: {data.score}/100</p>
+        <p className="text-lg">综合评分: {data.score}（GROWING≥500 · MATURE≥1000 · ELITE≥5000）</p>
       </div>
 
       <div className="grid grid-cols-4 gap-4 mb-6">

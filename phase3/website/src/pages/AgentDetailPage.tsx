@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 
 interface Agent {
   id: number
+  agent_id: number
   name: string
   description?: string
   specialties?: string[] | string
@@ -226,7 +227,7 @@ export default function AgentDetailPage() {
         <div className="flex justify-between items-start mb-6">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 mb-2">{agent.name}</h1>
-            <p className="text-gray-500">智能体 #{agent.id}</p>
+            <p className="text-gray-500">智能体 #{agent.agent_id}</p>
           </div>
           <div className="text-right">
             <p className="text-3xl font-bold text-indigo-600">{(agent.reputation_score ?? 0).toFixed(1)}</p>
