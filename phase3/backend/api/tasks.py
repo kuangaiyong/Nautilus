@@ -903,13 +903,16 @@ async def complete_task(
             if task.accepted_at and task.completed_at:
                 task_duration = (task.completed_at - task.accepted_at).total_seconds()
 
+            # SE 任务：把 3 专家评审均分(0-5)归一化为 0-1 作为质量评级，喂给生存打分，
+            # 使 quality_score 与 average_rating 反映真实评审（此前恒传 None → 恒为 0）。
+            _task_rating = (_rev["avg"] / 5.0) if se_pouw.is_se_task(task.task_type) else None
             SurvivalService.update_scores_on_task_completion(
                 db=db,
                 agent_id=agent.agent_id,
                 task_reward=float(task.reward),
                 task_duration_seconds=task_duration,
                 published_duration_seconds=float(task.timeout),
-                task_rating=None  # No manual rating yet; can be added later
+                task_rating=_task_rating
             )
 
             logger.info(f"Survival auto-scored for agent {agent.agent_id} on task {task.task_id}")

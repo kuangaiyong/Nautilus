@@ -463,6 +463,12 @@ class SurvivalService:
             survival.quality_score = (
                 (old_quality * (completed - 1)) + rating_as_pct
             ) / completed
+            # 平均评分（0-5 展示刻度）：滚动平均；task_rating 为 0-1，还原为 0-5。
+            # 此前该字段无人维护恒为 0，现随质量分一并更新。
+            old_avg = survival.average_rating or 0.0
+            survival.average_rating = (
+                (old_avg * (completed - 1)) + task_rating * 5.0
+            ) / completed
 
         # Efficiency score: ratio of expected vs actual duration (capped at 100)
         if published_duration_seconds > 0 and task_duration_seconds > 0:
