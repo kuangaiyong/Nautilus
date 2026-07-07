@@ -657,6 +657,11 @@ def mint_hua(
                 "gas": 120000, "gasPrice": 0, "chainId": config.chain_id,
             })
             tx_hash_hex = _sign_and_send_local(w3, tx, owner_pk)
+        # 等回执确认 status==1 才算成功：此前"发交易不等回执"在 nonce 撞车/掉链时会静默丢币
+        # （管理员以为充值成功、实际未到账，批量连发尤甚）。等回执在 nonce 锁外、不阻塞取 nonce。
+        receipt = w3.eth.wait_for_transaction_receipt("0x" + tx_hash_hex.lstrip("0x"), timeout=30)
+        if receipt.status != 1:
+            raise RuntimeError(f"华币铸造交易未上链成功 status=0 tx={tx_hash_hex[:18]}")
     except Exception as exc:
         logger.error("HUA mint to %s failed: %s", to_addr, exc)
         raise HTTPException(

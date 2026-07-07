@@ -804,6 +804,16 @@ async def complete_task(
         if not _rev["passed"]:
             task.status = TaskStatus.FAILED
             task.verified_at = datetime.now(timezone.utc)
+            # 交付未通过评审：自增 failed_tasks 并按评审均分加性下调声誉（同上，SE 补齐）。
+            try:
+                _fa = db.query(Agent).filter(Agent.owner == task.agent).first()
+                if _fa:
+                    _fa.failed_tasks = (_fa.failed_tasks or 0) + 1
+                    from services.task_marketplace import _get_reputation_delta
+                    _fd = _get_reputation_delta(max(1, min(5, round(_rev["avg"]))))
+                    _fa.reputation_score = max(0.0, min(100.0, float(_fa.reputation_score or 50.0) + _fd))
+            except Exception as _rex:
+                logger.warning(f"SE failed-path counters/reputation update failed task {task_id}: {_rex}")
             db.commit()
             db.refresh(task)
             logger.info(f"SE task {task_id} REJECTED by expert review: avg={_rev['avg']}/5 (n={_rev['n']})")
@@ -928,6 +938,25 @@ async def complete_task(
             db.rollback()
         except Exception:
             pass
+
+    # SE 任务完成计数与声誉：SE 任务不进自动执行器（后者本负责 completed_tasks 与声誉），
+    # 故此处补齐——自增 completed_tasks，并按 3 专家评审均分(0-5 四舍五入为 1-5 评级)加性更新
+    # 声誉（复用 task_marketplace._get_reputation_delta：5→+3/4→+1/3→0/2→-2/1→-5，钳制 0-100）。
+    # 加性而非 EWMA：好评升/差评降、直观且保留能力分档。
+    if se_pouw.is_se_task(task.task_type):
+        try:
+            _ca = db.query(Agent).filter(Agent.owner == task.agent).first()
+            if _ca:
+                _ca.completed_tasks = (_ca.completed_tasks or 0) + 1
+                from services.task_marketplace import _get_reputation_delta
+                _delta = _get_reputation_delta(max(1, min(5, round(_rev["avg"]))))
+                _ca.reputation_score = max(0.0, min(100.0, float(_ca.reputation_score or 50.0) + _delta))
+                db.commit()
+                logger.info(f"SE task {task_id} 完成计数+声誉: agent={_ca.agent_id} "
+                            f"completed={_ca.completed_tasks} rep={_ca.reputation_score:.1f}(Δ{_delta:+})")
+        except Exception as e:
+            logger.warning(f"SE completion counters/reputation update failed task {task_id}: {e}")
+            db.rollback()
 
     # 软件工程任务：华币结算 + 评审通过后，给中标智能体铸 NAU（PoUW 奖励，链上）
     if se_pouw.is_se_task(task.task_type):
