@@ -158,7 +158,7 @@ def _generate_deliverable(task_type, description, input_data, expected_output) -
         try:
             if not is_configured():
                 return None
-            raw = chat(prompt, system=system, max_tokens=2048, temperature=0.3)
+            raw = chat(prompt, system=system, max_tokens=8192, temperature=0.3)
             if raw and raw.strip():
                 return raw.strip()
         except Exception as exc:
@@ -212,10 +212,26 @@ def auto_deliver_accepted_se_tasks(db: Session) -> int:
 # P3 三专家评审（LLM 自动评分）
 # ---------------------------------------------------------------------------
 
-_REVIEW_SYSTEM = (
-    "你是资深软件工程评审专家。请客观评估交付物对任务要求的满足程度，"
-    "从正确性、完整性、规范性三维度打分（每维 0-5），并给出综合分(0-5)。"
-    "只输出 JSON，不要多余文字。"
+# 3 位评审专家各有独立评审侧重，避免「同一 prompt 重复 3 次 → 分数趋同」的评审同质化
+# （此前 _review_one 不含评审者身份，三评实为一个意见数三遍，低温下综合分必然收敛）。
+# 每位仍打全部三维 + 综合分（聚合逻辑不变），但从各自视角从严审查，产出真正独立的判断。
+_REVIEW_PERSONAS = [
+    ("正确性主审",
+     "你尤其严格审查交付物的正确性：是否真正、准确地满足任务要求，有无逻辑错误、事实错误、"
+     "答非所问、方案不可行。"),
+    ("完整性主审",
+     "你尤其严格审查交付物的完整性与覆盖度：是否覆盖正常/边界/异常路径，有无遗漏、截断、"
+     "半成品（如编号中断、章节缺失、写到一半戛然而止）。"),
+    ("规范性主审",
+     "你尤其严格审查交付物的规范性与可用性：结构是否清晰、格式是否统一、术语是否准确、"
+     "能否直接落地执行。"),
+]
+
+_REVIEW_SYSTEM_TMPL = (
+    "你是一个三人评审专家组中的「{name}」。{focus}"
+    "请基于你的评审侧重、独立客观地评估交付物对任务要求的满足程度，从正确性、完整性、"
+    "规范性三维度打分（每维 0-5）并给出综合分(0-5)。不要因『看起来还行』就给中庸分——"
+    "发现真实缺陷要如实扣分。只输出 JSON，不要多余文字。"
 )
 
 
@@ -242,9 +258,11 @@ def select_reviewers(db: Session, task, limit: Optional[int] = None) -> list:
     return out if limit is None else out[:limit]
 
 
-def _review_one(info: dict) -> dict:
+def _review_one(info: dict, persona: tuple = None) -> dict:
     """单个评审用统一 LLM 网关对交付物打分。入参为纯值快照(线程安全，供并行调用)。
 
+    persona=(name, focus) 给出该评审专家的独立评审侧重（正确性/完整性/规范性主审之一），
+    使三位专家从不同视角产出真正独立的判断、避免同质化趋同分；None 时退回通用综合评审。
     对模型间歇性空响应/格式问题做最多 3 次重试；空响应绝不当 0 分（否则会误判失败）。
     3 次仍拿不到有效评分时，回落中性分 3.0（benefit-of-doubt，不因 LLM 抖动卡死流程）。
     """
@@ -252,6 +270,11 @@ def _review_one(info: dict) -> dict:
     import re
     from services.llm_gateway import chat, is_configured
 
+    if persona:
+        system = _REVIEW_SYSTEM_TMPL.format(name=persona[0], focus=persona[1])
+    else:
+        system = _REVIEW_SYSTEM_TMPL.format(
+            name="综合评审专家", focus="你全面审查交付物的正确性、完整性与规范性。")
     deliverable = (info.get("result") or "")[:6000]
     prompt = (
         f"任务类型: {info.get('task_type')}\n任务要求:\n{(info.get('description') or '')[:2000]}\n\n"
@@ -266,7 +289,7 @@ def _review_one(info: dict) -> dict:
         try:
             if not is_configured():
                 raise RuntimeError("LLM 网关未配置")
-            raw = chat(prompt, system=_REVIEW_SYSTEM, max_tokens=500, temperature=0.2)
+            raw = chat(prompt, system=system, max_tokens=500, temperature=0.2)
             if not raw or not raw.strip():
                 last_err = "空响应"
                 continue
@@ -340,7 +363,9 @@ def run_expert_reviews(db: Session, task_id: int) -> dict:
         for agent in pool:
             if persisted >= need:
                 break
-            sc = _review_one(info)
+            # 按评审位次分配独立评审侧重（正确性/完整性/规范性主审轮换），避免三评同质化趋同分
+            persona = _REVIEW_PERSONAS[(len(done) + persisted) % len(_REVIEW_PERSONAS)]
+            sc = _review_one(info, persona)
             if sc.get("degraded"):
                 continue  # 该次 LLM 无有效评分：换下一个候选补评（degraded 不持久化）
             review = TaskReview(
