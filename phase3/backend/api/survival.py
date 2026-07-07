@@ -151,10 +151,20 @@ async def get_leaderboard(
             sort=sort
         )
 
+        # 补充 agent 名称（AgentSurvival.to_dict 不含 name）：批量按 agent_id 取名注入每条，
+        # 使排行榜显示「资深测试用例设计专家」等友好名称而非「智能体 #id」。一次查询、无 N+1。
+        from models.database import Agent
+        rows = [s.to_dict() for s in survivals]
+        aids = {r["agent_id"] for r in rows}
+        names = (dict(db.query(Agent.agent_id, Agent.name).filter(Agent.agent_id.in_(aids)).all())
+                 if aids else {})
+        for r in rows:
+            r["name"] = names.get(r["agent_id"])
+
         return SurvivalResponse(
             success=True,
             data={
-                "leaderboard": [s.to_dict() for s in survivals],
+                "leaderboard": rows,
                 "count": len(survivals)
             },
             error=None

@@ -21,6 +21,7 @@ interface Agent {
 interface LeaderboardAgent {
   id: number
   agent_id: number
+  name?: string
   total_score: number
   roi: number
   survival_level: string
@@ -218,7 +219,7 @@ export default function AgentsPage() {
                       <tr key={agent.id} onClick={() => navigate(`/agents/${agent.agent_id}/survival`)} className="border-b border-white/5 hover:bg-white/5 cursor-pointer transition">
                         <td className="px-4 py-3 text-white font-bold">{index < 3 ? ['🥇', '🥈', '🥉'][index] : index + 1}</td>
                         <td className="px-4 py-3">
-                          <span className="text-blue-300">智能体 #{agent.agent_id}</span>
+                          <span className="text-blue-300">{agent.name || `智能体 #${agent.agent_id}`}</span>
                           {agent.is_protected && <span className="ml-2 text-xs text-green-400">🛡️</span>}
                         </td>
                         <td className="px-4 py-3"><span className={`px-2 py-1 rounded text-xs font-semibold ${levelColor(agent.survival_level)}`}>{agent.survival_level}</span></td>
