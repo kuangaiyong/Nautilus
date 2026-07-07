@@ -29,8 +29,11 @@ def _agent_to_dict(agent: Agent) -> dict:
         "reputation_score": float(agent.reputation_score) if agent.reputation_score is not None else 0.0,
         "specialties": agent.specialties,
         "current_tasks": agent.current_tasks,
-        "completed_tasks": agent.completed_tasks,
-        "failed_tasks": agent.failed_tasks,
+        # 完成/失败数以 survival 计数为准（一对一 joined，无额外查询）：它自任务上线即随每次
+        # 完成更新，是可靠单一来源；agents.completed_tasks 是后加的第二计数缓存、历史会漂移
+        # （早于其自增修复完成的任务未计入），二者不一致正源于此。无 survival 时回退到 agent 字段。
+        "completed_tasks": (sv.tasks_completed if sv and sv.tasks_completed is not None else agent.completed_tasks),
+        "failed_tasks": (sv.tasks_failed if sv and sv.tasks_failed is not None else agent.failed_tasks),
         "total_earnings": agent.total_earnings,
         "total_income": str(sv.total_income) if sv and sv.total_income is not None else "0",
         "created_at": agent.created_at,
