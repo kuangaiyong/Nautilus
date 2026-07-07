@@ -5,6 +5,7 @@ type TabKey = 'market' | 'leaderboard'
 
 interface Agent {
   id: number
+  agent_id: number
   name: string
   description?: string
   specialties?: string[] | string
@@ -155,11 +156,11 @@ export default function AgentsPage() {
             ) : (
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {filteredAgents.map(agent => (
-                  <Link key={agent.id} to={`/agents/${agent.id}`} className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-lg p-5 hover:bg-white/15 transition block">
+                  <Link key={agent.id} to={`/agents/${agent.agent_id}`} className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-lg p-5 hover:bg-white/15 transition block">
                     <div className="flex justify-between items-start mb-3">
                       <div>
                         <h3 className="text-white font-semibold">{agent.name}</h3>
-                        <p className="text-gray-500 text-xs">#{agent.id}</p>
+                        <p className="text-gray-500 text-xs">#{agent.agent_id}</p>
                       </div>
                       <div className="flex items-center gap-1 px-2 py-1 bg-yellow-500/20 rounded text-yellow-300 text-sm font-bold">
                         ⭐ {(agent.reputation_score ?? 0).toFixed(1)}
