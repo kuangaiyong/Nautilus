@@ -137,16 +137,28 @@ _DELIVER_SYSTEM = (
 )
 
 
-def _generate_deliverable(task_type, description, input_data, expected_output) -> Optional[str]:
+def _generate_deliverable(task_type, description, input_data, expected_output,
+                          agent_name=None, agent_desc=None, agent_specs=None) -> Optional[str]:
     """用统一 LLM 网关为 SE 任务生成交付物。
 
+    系统提示词优先采用中标智能体自身的人设（名称 + 描述 + 专长标签），让「智能体的提示词」
+    真正塑造产出；智能体无描述时回退到按任务类型的通用专家角色。
     对模型间歇性空响应做最多 3 次重试；LLM 未配置或始终拿不到非空输出时返回 None
     （宁可保持 ACCEPTED 下轮重试，也绝不写入空/垃圾交付物）。
     """
     from services.llm_gateway import chat, is_configured
 
     role, artifact = _DELIVER_ROLE.get(se_pouw._norm(task_type), ("资深软件工程师", "高质量交付物"))
-    system = _DELIVER_SYSTEM.format(role=role, artifact=artifact)
+    if agent_desc and agent_desc.strip():
+        specs_txt = "、".join(se_pouw.parse_specialties(agent_specs)) if agent_specs else ""
+        system = (
+            f"你是「{agent_name or role}」。{agent_desc.strip()}"
+            + (f"（专长标签：{specs_txt}）" if specs_txt else "")
+            + f"\n现以你的专业身份，针对下面的软件工程任务，直接产出高质量的{artifact}。"
+            "只输出交付物本身，不要寒暄、不要复述任务。"
+        )
+    else:
+        system = _DELIVER_SYSTEM.format(role=role, artifact=artifact)
     prompt = (
         f"任务类型: {se_pouw._norm(task_type)}\n"
         f"任务要求:\n{(description or '')[:2000]}\n\n"
@@ -187,7 +199,9 @@ def auto_deliver_accepted_se_tasks(db: Session) -> int:
         if not agent or not agent.autonomy_enabled:
             continue  # 非自主/手动抢单的任务交由其自行提交
         deliverable = _generate_deliverable(task.task_type, task.description,
-                                            task.input_data, task.expected_output)
+                                            task.input_data, task.expected_output,
+                                            agent_name=agent.name, agent_desc=agent.description,
+                                            agent_specs=agent.specialties)
         if not deliverable:
             continue  # LLM 不可用，保持 ACCEPTED 下轮重试
 
