@@ -810,6 +810,20 @@ async def complete_task(
             return task
         logger.info(f"SE task {task_id} PASSED expert review: avg={_rev['avg']}/5 (n={_rev['n']})")
 
+    # 并发保护（防重复结算/双扣款）：SE 自动评审结算(cron se_marketplace)与发布者手动
+    # 「完成」按钮可能并发触发本端点。此前从「检查 SUBMITTED」到「pay + 置 COMPLETED」之间
+    # 无原子性，两个调用会各 pay_hua 一次 → 华币重复扣款。此处在 pay 前用行锁原子抢占：只有
+    # 把仍处 SUBMITTED 的任务行锁到手者才继续结算；并发的另一方在此阻塞至本次 commit 后读到
+    # 状态已非 SUBMITTED → 409 退出、不重复付款。（SQLite 无行锁会忽略此锁，仅 MySQL 生效。）
+    _claim = (db.query(Task).filter(Task.id == task_id, Task.status == TaskStatus.SUBMITTED)
+              .with_for_update().first())
+    if _claim is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"error": {"code": "ALREADY_SETTLED",
+                              "message": "任务已被结算或正在结算，请勿重复操作"}},
+        )
+
     # Reviewer (publisher) approved the submission. Settle the reward on-chain
     # BEFORE marking the task completed, so a payment failure leaves the task
     # reviewable rather than silently "completed but unpaid". The publisher's
