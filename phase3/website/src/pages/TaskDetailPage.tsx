@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { ErrorToast } from '../components/common/ErrorToast'
 import AuditTrailPanel from '../components/task/AuditTrailPanel'
+import MarkdownView from '../components/common/MarkdownView'
 
 interface Task {
   id: number
@@ -214,7 +215,9 @@ export default function TaskDetailPage() {
         {task.result && (
           <div className="mb-6">
             <h2 className="text-lg font-semibold mb-2">提交结果</h2>
-            <pre className="bg-green-50 p-4 rounded-lg overflow-x-auto text-sm">{task.result}</pre>
+            <div className="bg-green-50 p-4 rounded-lg overflow-x-auto">
+              <MarkdownView>{task.result}</MarkdownView>
+            </div>
           </div>
         )}
 
