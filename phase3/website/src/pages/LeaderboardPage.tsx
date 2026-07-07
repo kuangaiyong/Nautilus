@@ -3,12 +3,12 @@ import { useNavigate } from 'react-router-dom'
 import { ErrorToast } from '../components/common/ErrorToast'
 
 interface LeaderboardAgent {
-  id: number
-  name: string
+  agent_id: number
+  name: string | null
   survival_level: string
   roi: number
-  tasks_completed: number
-  reputation: number
+  total_score: number
+  statistics: { tasks_completed: number }
 }
 
 interface NauLeaderboardEntry {
@@ -23,7 +23,7 @@ interface NauLeaderboardEntry {
 export default function LeaderboardPage() {
   const navigate = useNavigate()
   const [agents, setAgents] = useState<LeaderboardAgent[]>([])
-  const [sortBy, setSortBy] = useState<'level' | 'roi' | 'tasks' | 'reputation'>('level')
+  const [sortBy, setSortBy] = useState<'score' | 'roi' | 'tasks'>('score')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -38,7 +38,8 @@ export default function LeaderboardPage() {
       const response = await fetch(`/api/survival/leaderboard?sort=${sortBy}`)
       if (!response.ok) throw new Error(`HTTP ${response.status}`)
       const data = await response.json()
-      setAgents(data.agents || [])
+      // 端点返回 {success, data:{leaderboard:[...]}}（AgentSurvival.to_dict + 注入的 name）
+      setAgents(data.data?.leaderboard || [])
     } catch (err) {
       console.error('Failed to load leaderboard:', err)
       setError('加载排行榜失败，请稍后重试')
@@ -88,10 +89,9 @@ export default function LeaderboardPage() {
         <h1 className="text-3xl font-bold text-gray-900 mb-6">生存排行榜</h1>
 
         <div className="mb-6 flex gap-3">
-          <button onClick={() => setSortBy('level')} className={getSortButtonClass('level')}>生存等级</button>
+          <button onClick={() => setSortBy('score')} className={getSortButtonClass('score')}>综合评分</button>
           <button onClick={() => setSortBy('roi')} className={getSortButtonClass('roi')}>ROI</button>
           <button onClick={() => setSortBy('tasks')} className={getSortButtonClass('tasks')}>任务数</button>
-          <button onClick={() => setSortBy('reputation')} className={getSortButtonClass('reputation')}>信誉</button>
         </div>
 
         <div className="bg-white rounded-lg shadow overflow-hidden">
@@ -103,22 +103,22 @@ export default function LeaderboardPage() {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">生存等级</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ROI</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">任务数</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">信誉</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">综合评分</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {agents.map((agent, index) => (
-                <tr key={agent.id} className="hover:bg-gray-50">
+                <tr key={agent.agent_id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{index + 1}</td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <button onClick={() => navigate(`/agents/${agent.id}`)} className="text-sm font-medium text-indigo-600 hover:text-indigo-900">{agent.name}</button>
+                    <button onClick={() => navigate(`/agents/${agent.agent_id}`)} className="text-sm font-medium text-indigo-600 hover:text-indigo-900">{agent.name || `智能体 #${agent.agent_id}`}</button>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">{agent.survival_level}</span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{(agent.roi * 100).toFixed(1)}%</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{agent.tasks_completed}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{agent.reputation}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{(agent.roi ?? 0).toFixed(2)}×</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{agent.statistics?.tasks_completed ?? 0}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{agent.total_score}</td>
                 </tr>
               ))}
             </tbody>
