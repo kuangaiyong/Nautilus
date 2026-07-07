@@ -76,54 +76,67 @@ class NautilusTokenService:
         nau_amount = TASK_TYPE_REWARDS.get(task_type, 1)
         amount_wei = nau_amount * (10 ** _NAU_DECIMALS)
 
-        try:
-            w3 = get_w3()
-            account = cfg.get_account_address()
-            if not account:
-                logger.warning("Cannot derive account address from private key")
-                return None
-
-            checksum_wallet = Web3.to_checksum_address(agent_wallet)
-            # 串行化 minter 账户的"取 nonce(pending)→广播"，防并发铸币撞同一 nonce 致部分丢失。
-            # 与 api.wallets.mint_hua（同一 minter 账户铸华币）共享 per-account 锁。
-            with account_nonce_lock(account):
-                nonce = w3.eth.get_transaction_count(account, "pending")
-                tx = cfg.nau_contract.functions.mintForTask(
-                    checksum_wallet,
-                    amount_wei,
-                    task_type,
-                ).build_transaction({
-                    "from": account,
-                    "nonce": nonce,
-                    "chainId": cfg.chain_id,
-                })
-                signed = w3.eth.account.sign_transaction(tx, BLOCKCHAIN_PRIVATE_KEY)
-                tx_hash = w3.eth.send_raw_transaction(signed.raw_transaction)
-            tx_hash_hex = tx_hash.hex()
-
-            logger.info(
-                "Minted %d NAU to %s for %s task, tx: %s",
-                nau_amount, agent_wallet, task_type, tx_hash_hex,
-            )
-            try:
-                r = redis_lib.from_url(REDIS_URL, decode_responses=True)
-                today = datetime.utcnow().strftime("%Y-%m-%d")
-                r.incrbyfloat(f"nau:minted_today:{today}", nau_amount)
-                r.expire(f"nau:minted_today:{today}", 86400 * 7)
-            except Exception:
-                pass  # Redis 不可用时静默
-            return tx_hash_hex
-
-        except Exception as e:
-            logger.warning("NAU mint failed for %s (%s): %s", agent_wallet, task_type, e)
-            try:
-                r = redis_lib.from_url(REDIS_URL, decode_responses=True)
-                today = datetime.utcnow().strftime("%Y-%m-%d")
-                r.incr(f"nau:mint_failures:{today}")
-                r.expire(f"nau:mint_failures:{today}", 86400 * 7)
-            except Exception:
-                pass  # Redis 不可用时静默
+        w3 = get_w3()
+        account = cfg.get_account_address()
+        if not account:
+            logger.warning("Cannot derive account address from private key")
             return None
+        checksum_wallet = Web3.to_checksum_address(agent_wallet)
+
+        # 铸币必须"确认真正上链"才算成功：此前"发交易不等回执"会在交易 revert / 掉链 /
+        # 跨进程 nonce 撞车时静默丢币（任务已 COMPLETED 却无 NAU 到账、无人知晓、无从补）。
+        # 现改为：发交易 → 等回执，status==1 才返回 tx_hash；否则换新 pending nonce 重试，
+        # 最多 3 次；全失败返回 None（调用方据此记 ERROR / 后续补铸）。等回执在锁外，
+        # 不阻塞其他铸币取 nonce。
+        last_err = None
+        for attempt in range(3):
+            try:
+                # 串行化 minter 账户的"取 nonce(pending)→广播"，防并发铸币撞同一 nonce；
+                # 与 api.wallets.mint_hua（同一 minter 账户铸华币）共享 per-account 锁。
+                with account_nonce_lock(account):
+                    nonce = w3.eth.get_transaction_count(account, "pending")
+                    tx = cfg.nau_contract.functions.mintForTask(
+                        checksum_wallet,
+                        amount_wei,
+                        task_type,
+                    ).build_transaction({
+                        "from": account,
+                        "nonce": nonce,
+                        "chainId": cfg.chain_id,
+                    })
+                    signed = w3.eth.account.sign_transaction(tx, BLOCKCHAIN_PRIVATE_KEY)
+                    tx_hash = w3.eth.send_raw_transaction(signed.raw_transaction)
+                receipt = w3.eth.wait_for_transaction_receipt(tx_hash, timeout=30)
+                if receipt.status == 1:
+                    tx_hash_hex = tx_hash.hex()
+                    logger.info(
+                        "Minted %d NAU to %s for %s task, tx: %s",
+                        nau_amount, agent_wallet, task_type, tx_hash_hex,
+                    )
+                    try:
+                        r = redis_lib.from_url(REDIS_URL, decode_responses=True)
+                        today = datetime.utcnow().strftime("%Y-%m-%d")
+                        r.incrbyfloat(f"nau:minted_today:{today}", nau_amount)
+                        r.expire(f"nau:minted_today:{today}", 86400 * 7)
+                    except Exception:
+                        pass  # Redis 不可用时静默
+                    return tx_hash_hex
+                last_err = f"tx reverted status=0 tx={tx_hash.hex()[:18]}"
+                logger.warning("NAU mint 第%d/3 次未成功: %s", attempt + 1, last_err)
+            except Exception as e:
+                last_err = str(e)
+                logger.warning("NAU mint 第%d/3 次异常: %s", attempt + 1, e)
+
+        logger.error("NAU mint 最终失败 for %s (%s) 经 3 次重试仍未上链: %s",
+                     agent_wallet, task_type, last_err)
+        try:
+            r = redis_lib.from_url(REDIS_URL, decode_responses=True)
+            today = datetime.utcnow().strftime("%Y-%m-%d")
+            r.incr(f"nau:mint_failures:{today}")
+            r.expire(f"nau:mint_failures:{today}", 86400 * 7)
+        except Exception:
+            pass  # Redis 不可用时静默
+        return None
 
     @staticmethod
     async def mint_collaborative_reward(
