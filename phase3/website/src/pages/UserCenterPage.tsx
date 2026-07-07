@@ -298,7 +298,7 @@ export default function UserCenterPage() {
                   {myAgents.map(agent => (
                     <div
                       key={agent.agent_id}
-                      onClick={() => navigate(`/agents/${agent.agent_id}`)}
+                      onClick={() => navigate(`/my-agents/${agent.agent_id}`)}
                       className="border rounded-lg p-4 hover:border-blue-300 hover:shadow-md cursor-pointer transition-all"
                     >
                       <div className="flex justify-between items-start">

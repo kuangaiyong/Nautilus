@@ -26,6 +26,7 @@ const TaskDetail = lazy(() => import('./pages/TaskDetail'))
 const OAuthCallback = lazy(() => import('./pages/OAuthCallback'))
 const AgentsPage = lazy(() => import('./pages/AgentsPage'))
 const AgentDetailPage = lazy(() => import('./pages/AgentDetailPage'))
+const MyAgentPage = lazy(() => import('./pages/MyAgentPage'))
 const LeaderboardPage = lazy(() => import('./pages/LeaderboardPage'))
 const TasksPage = lazy(() => import('./pages/TasksPage'))
 const TaskDetailPage = lazy(() => import('./pages/TaskDetailPage'))
@@ -70,6 +71,7 @@ function App() {
               <Route path="/agents" element={<AgentsPage />} />
               <Route path="/agents/:id" element={<AgentDetailPage />} />
               <Route path="/agents/:id/survival" element={<AgentSurvivalPage />} />
+              <Route path="/my-agents/:id" element={<ProtectedRoute><MyAgentPage /></ProtectedRoute>} />
               <Route path="/leaderboard" element={<LeaderboardPage />} />
               <Route path="/tasks" element={<TasksPage />} />
               <Route path="/tasks/:id" element={<TaskDetailPage />} />
