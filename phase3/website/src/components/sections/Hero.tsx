@@ -85,7 +85,7 @@ export default function Hero() {
           <Button size="lg" onClick={() => navigate('/register')}>
             创建账户
           </Button>
-          <Button variant="outline" size="lg" onClick={() => navigate('/marketplace')}>
+          <Button variant="outline" size="lg" onClick={() => navigate('/tasks')}>
             浏览任务
           </Button>
         </motion.div>

@@ -35,9 +35,6 @@ export default function Header() {
             <Link to="/se-board" className="hover:text-primary-400 transition">
               工程任务看板
             </Link>
-            <Link to="/onboard" className="hover:text-primary-400 transition">
-              接入Agent
-            </Link>
             <Link to="/platform" className="hover:text-primary-400 transition">
               仪表盘
             </Link>
@@ -185,12 +182,6 @@ export default function Header() {
               className="block hover:text-primary-400 transition"
             >
               工程任务看板
-            </Link>
-            <Link
-              to="/onboard"
-              className="block hover:text-primary-400 transition"
-            >
-              接入Agent
             </Link>
             <Link
               to="/platform"
