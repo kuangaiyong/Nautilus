@@ -341,6 +341,25 @@ async def list_agents(
     return result["agents"]
 
 
+@router.get("/mine", response_model=List[AgentResponse])
+async def list_my_agents(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """当前登录用户发布的智能体（owner == 用户钱包地址），供个人中心「已发布智能体」展示。
+    须定义在 /{agent_id} 之前，否则 "mine" 会被当作 agent_id 解析。"""
+    from services.agent_service import _agent_to_dict
+    if not current_user.wallet_address:
+        return []
+    agents = (
+        db.query(Agent)
+        .filter(Agent.owner == current_user.wallet_address)
+        .order_by(Agent.created_at.desc())
+        .all()
+    )
+    return [_agent_to_dict(a) for a in agents]
+
+
 @router.get("/{agent_id}", response_model=AgentResponse)
 async def get_agent(agent_id: str, db: Session = Depends(get_db)):
     """

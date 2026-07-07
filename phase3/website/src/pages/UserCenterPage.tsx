@@ -23,6 +23,16 @@ interface Task {
   created_at: string
 }
 
+interface MyAgent {
+  agent_id: number
+  name: string
+  description?: string
+  specialties?: string | string[]
+  reputation_score?: number
+  completed_tasks: number
+  failed_tasks: number
+}
+
 export default function UserCenterPage() {
   const navigate = useNavigate()
   const { user, token, logout } = useAuth()
@@ -35,6 +45,7 @@ export default function UserCenterPage() {
     reputation: null
   })
   const [recentTasks, setRecentTasks] = useState<Task[]>([])
+  const [myAgents, setMyAgents] = useState<MyAgent[]>([])
   const [loading, setLoading] = useState(true)
   const [editMode, setEditMode] = useState(false)
   const [walletAddress, setWalletAddress] = useState((user as any)?.wallet_address || '')
@@ -63,6 +74,12 @@ export default function UserCenterPage() {
           reputation: d.reputation ?? null
         })
         setRecentTasks(Array.isArray(d.recent_tasks) ? d.recent_tasks : [])
+        try {
+          const ra = await fetch('/api/agents/mine', {
+            headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+          })
+          if (ra.ok) { const arr = await ra.json(); setMyAgents(Array.isArray(arr) ? arr : []) }
+        } catch { /* 忽略：不影响个人中心其余内容 */ }
       } catch (e) {
         console.error('加载失败:', e)
       } finally {
@@ -120,6 +137,14 @@ export default function UserCenterPage() {
   } as Record<string, string>)[s] || s)
 
   const formatHua = (wei: string | number) => (Number(wei) / 1e18).toFixed(4)
+
+  // 专长可能是 JSON 数组字符串 / 逗号分隔 / 数组，统一解析为标签列表
+  const parseSpecialties = (s?: string | string[]): string[] => {
+    if (!s) return []
+    if (Array.isArray(s)) return s.map(String)
+    try { const p = JSON.parse(s); if (Array.isArray(p)) return p.map(String) } catch { /* 非 JSON */ }
+    return String(s).split(',').map(x => x.trim()).filter(Boolean)
+  }
 
   if (!user) return null
 
@@ -252,6 +277,50 @@ export default function UserCenterPage() {
                 <p className="text-sm text-gray-600">累计支出</p>
                 <p className="text-2xl font-bold text-orange-600 mt-1">{formatHua(stats.total_spent)} 华币</p>
               </div>
+            </div>
+
+            <div className="bg-white rounded-lg shadow-lg p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-bold">已发布智能体</h2>
+                <button onClick={() => navigate('/agents')} className="text-blue-600 text-sm">全部智能体 &rarr;</button>
+              </div>
+              {loading ? (
+                <div className="flex justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                </div>
+              ) : myAgents.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  <User className="w-12 h-12 mx-auto mb-3 text-gray-400" />
+                  <p>你还没有发布智能体</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {myAgents.map(agent => (
+                    <div
+                      key={agent.agent_id}
+                      onClick={() => navigate(`/agents/${agent.agent_id}`)}
+                      className="border rounded-lg p-4 hover:border-blue-300 hover:shadow-md cursor-pointer transition-all"
+                    >
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h3 className="font-bold text-gray-900">{agent.name}</h3>
+                          <p className="text-xs text-gray-500">智能体 #{agent.agent_id}</p>
+                        </div>
+                        <span className="text-sm font-bold text-yellow-600 shrink-0">⭐ {(agent.reputation_score ?? 0).toFixed(1)}</span>
+                      </div>
+                      {agent.description && <p className="text-sm text-gray-600 mt-2">{agent.description}</p>}
+                      {parseSpecialties(agent.specialties).length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {parseSpecialties(agent.specialties).map(tag => (
+                            <span key={tag} className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-xs">{tag}</span>
+                          ))}
+                        </div>
+                      )}
+                      <div className="mt-2 text-xs text-gray-500">完成任务 {agent.completed_tasks} · 失败 {agent.failed_tasks}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="bg-white rounded-lg shadow-lg p-6">
