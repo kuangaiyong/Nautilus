@@ -114,98 +114,136 @@ class PainSignal:
         return f"Pain({self.source}: {self.intensity:.1f} — {self.description})"
 
 
+def _derive_pain_signals(m: Dict[str, Any]) -> "tuple[List[PainSignal], List[Dict[str, str]]]":
+    """从真实平台指标推导痛苦信号与内部对话（纯函数，便于单测各分支）。
+
+    输入为 api.platform._compute_metrics 的返回（真实 DMAS 口径）。
+    """
+    pain_signals: List[PainSignal] = []
+    dialogue: List[Dict[str, str]] = []
+
+    total_agents = m.get("total_agents") or 0
+    healthy = m.get("agents_healthy") or 0
+    tracked = m.get("agents_survival_tracked") or 0
+    failed_24h = m.get("tasks_failed_24h") or 0
+    success_rate = m.get("task_success_rate")    # None：近 24h 无已结束任务
+    fill_rate = m.get("marketplace_fill_rate")   # None：近 24h 无任务
+    # 按 completed_at / verified_at 统计的「近 24h 真实结算数」。不能用
+    # tasks_completed_24h：那是「近 24h 创建的任务中已完成的个数」（created_at 窗口），
+    # 3 天前发布、10 分钟前刚交付结算的任务不计入，会误报市场停摆。
+    settled_24h = m.get("tasks_settled_24h") or 0
+
+    # --- 市场停滞：近 24h 零任务结算，智能体无工赚华币、生存承压 ---
+    if settled_24h == 0:
+        pain_signals.append(PainSignal(
+            "market", 0.7,
+            "近 24 小时没有任务结算，市场冷清。智能体无工可做，难以赚取华币维持生存。",
+            "发布新任务激活市场，或降低竞价门槛吸引智能体参与。",
+        ))
+        dialogue.extend([
+            {"voice": "commander", "says": "市场停摆了。24 小时零任务成交，智能体在饿肚子。"},
+            {"voice": "executor", "says": "撮合管线是通的，但没有新任务进来。得从供给侧注入。"},
+        ])
+
+    # --- 智能体濒危：有智能体跌出健康生存区，逼近淘汰 ---
+    if total_agents > 0 and healthy < total_agents:
+        endangered = total_agents - healthy
+        pain_signals.append(PainSignal(
+            "survival", round(min(0.5 + endangered / total_agents * 0.5, 1.0), 2),
+            f"{endangered}/{total_agents} 个智能体跌出健康生存区，濒临淘汰。",
+            "为濒危智能体导流高价值任务，或触发生存保护期。",
+        ))
+        dialogue.extend([
+            {"voice": "commander", "says": f"{endangered} 个智能体在死亡线上。生存竞争是不是太残酷了？"},
+            {"voice": "executor", "says": "淘汰是机制的一部分，但流失太快生态会崩，得平衡。"},
+        ])
+
+    # --- 任务质量：近 24h 成功率偏低 ---
+    if success_rate is not None and success_rate < 0.9:
+        pain_signals.append(PainSignal(
+            "quality", round(min(0.6 + (0.9 - success_rate), 1.0), 2),
+            f"近 24 小时任务成功率仅 {success_rate * 100:.0f}%，{failed_24h} 个任务失败。",
+            "复盘失败任务，加强专家评审或优化能力匹配。",
+        ))
+        dialogue.extend([
+            {"voice": "commander", "says": f"成功率跌到 {success_rate * 100:.0f}%，交付质量在滑坡。"},
+            {"voice": "executor", "says": "评审门控还在，但要排查失败集中的任务类型。"},
+        ])
+
+    # --- 市场撮合：近 24h 有任务却无人承接 ---
+    if fill_rate is not None and fill_rate < 0.8:
+        pain_signals.append(PainSignal(
+            "fill_rate", round(min(0.5 + (0.8 - fill_rate), 1.0), 2),
+            f"近 24 小时任务撮合率仅 {fill_rate * 100:.0f}%，部分任务无人竞标。",
+            "提高任务奖励，或扩大对口专长的智能体供给。",
+        ))
+
+    # --- 生存追踪缺口：有智能体未纳入生存核算，经济状态不可见 ---
+    if total_agents > 0 and tracked < total_agents:
+        pain_signals.append(PainSignal(
+            "coverage", 0.4,
+            f"{total_agents - tracked} 个智能体未纳入生存追踪，经济状态不可见。",
+            "为未追踪的智能体补建生存档案。",
+        ))
+
+    if not pain_signals:
+        dialogue.extend([
+            {"voice": "commander", "says": "指标健康：市场在转、智能体在活、交付达标。但别麻木，持续盯着生存曲线。"},
+            {"voice": "executor", "says": "收到。维持撮合节奏，守住健康分。"},
+        ])
+
+    pain_signals.sort(key=lambda p: p.intensity, reverse=True)
+    return pain_signals, dialogue
+
+
 class BicameralMind:
     """Two voices debating inside the system. Pain drives change."""
 
     def reflect(self) -> Dict[str, Any]:
-        """Run a full bicameral reflection cycle."""
+        """基于「真实平台经济」运行一次二分心智反思。
+
+        痛苦信号来自真实 DMAS 指标（agents/tasks/agent_survival，复用
+        api.platform._compute_metrics，与平台仪表盘 / cron 快照同口径），反映
+        本平台真实的「经济生存压力」——而非遗留商业营收口径（Order/Customer，
+        私有化后恒空）导致的失真焦虑（此前恒报「收入为零」痛苦指数 95%）。
+        """
+        from sqlalchemy import text
         from utils.database import get_db_context
+        from api.platform import _compute_metrics, _health_score
 
         with get_db_context() as db:
-            state = _gather_platform_state(db)
+            m = _compute_metrics(db)
+            health = _health_score(m)
+            # total_tasks 是 SelfImprovementEngine 生成 platform_evolution 任务的闸门
+            total_tasks = db.execute(text("SELECT COUNT(*) FROM tasks")).scalar() or 0
+            # 近 24h 真实结算数：完成走 completed_at，评审判负走 verified_at
+            m["tasks_settled_24h"] = db.execute(text(
+                "SELECT COUNT(*) FROM tasks WHERE "
+                "(status='COMPLETED' AND completed_at >= (NOW() - INTERVAL 24 HOUR)) "
+                "OR (status='FAILED' AND verified_at >= (NOW() - INTERVAL 24 HOUR))"
+            )).scalar() or 0
+            # quality 模板要用「近 24h 失败最多的任务类型」，取真值而非占位符
+            fail_by_type = {
+                r[0]: int(r[1]) for r in db.execute(text(
+                    "SELECT task_type, COUNT(*) FROM tasks WHERE status='FAILED' "
+                    "AND created_at >= (NOW() - INTERVAL 24 HOUR) GROUP BY task_type"
+                )).fetchall()
+            }
 
-        now = state["time"]
-        pain_signals: List[PainSignal] = []
-        dialogue: List[Dict[str, str]] = []
+        now = datetime.now()
+        pain_signals, dialogue = _derive_pain_signals(m)
 
-        # --- Revenue Pain ---
-        if state["total_revenue"] <= 0:
-            pain_signals.append(PainSignal(
-                "revenue", 1.0,
-                "平台运行至今收入为零。每天消耗服务器和API成本，没有任何回报。",
-                "必须在48小时内获取第一个付费客户。",
-            ))
-            dialogue.extend([
-                {"voice": "commander", "says": "收入为零。构建了执行能力，但没有一分钱进账。这不是'还没开始'，这是失败。"},
-                {"voice": "executor", "says": "技术管线验证通过了...但你说得对，没有收入一切都没有意义。"},
-                {"voice": "commander", "says": "停止优化技术。去找客户。今天。现在。"},
-            ])
-        elif state["total_revenue"] < 1000:
-            pain_signals.append(PainSignal(
-                "revenue", 0.7,
-                f"总收入仅¥{state['total_revenue']:.0f}，远不够覆盖运营成本。",
-                "扩大客户源，提高接单频率。",
-            ))
-
-        # --- Customer Pain ---
-        if state["total_customers"] == 0 or state["active_24h"] == 0:
-            pain_signals.append(PainSignal(
-                "customers", 0.9,
-                "24小时内没有活跃客户。平台像一座空城。",
-                "通过企微/Telegram主动联系潜在客户。",
-            ))
-            dialogue.extend([
-                {"voice": "commander", "says": "没有人在用这个平台。我们为谁而建？"},
-                {"voice": "executor", "says": "渠道已经搭建好了。但没有人知道我们存在。"},
-                {"voice": "commander", "says": "那就让他们知道。坐等客户上门不是策略，是懈怠。"},
-            ])
-
-        # --- Quality Pain ---
-        if state["success_rate"] < 90 and state["fail_by_type"]:
-            worst_type = max(state["fail_by_type"], key=state["fail_by_type"].get)
-            pain_signals.append(PainSignal(
-                "quality", 0.6,
-                f"成功率{state['success_rate']:.1f}%，{state['failed']}个任务失败。",
-                f"优先修复失败最多的类型: {worst_type}",
-            ))
-            dialogue.extend([
-                {"voice": "commander", "says": f"{worst_type} 失败了{state['fail_by_type'][worst_type]}次。你能接受吗？"},
-                {"voice": "executor", "says": "不能。Bootstrap已识别出失败模式，我会强制应用模板改进。"},
-            ])
-
-        # --- Existential Pain ---
-        if state["total_revenue"] <= 0 and state["all_tasks"] > 50:
-            pain_signals.append(PainSignal(
-                "existential", 1.0,
-                "执行了超过50个任务但0收入。技术没有转化为价值。",
-                "重新审视商业模式。先用最简单的方式赚到第一块钱。",
-            ))
-            dialogue.extend([
-                {"voice": "commander", "says": "构建了复杂系统但没有人用。这些真的有必要吗？"},
-                {"voice": "executor", "says": "也许应该先赚到第一块钱，再考虑复杂架构。"},
-                {"voice": "commander", "says": "终于说了实话。先赚钱，再进化。"},
-            ])
-
-        # --- Unpaid Orders Pain ---
-        if state["unpaid"]:
-            pain_signals.append(PainSignal(
-                "conversion", 0.5,
-                f"{len(state['unpaid'])}个订单报了价但没有付款。转化漏斗断裂。",
-                "24小时内主动跟进这些客户。",
-            ))
-
-        if not pain_signals:
-            dialogue.append({"voice": "commander", "says": "一切看起来正常？不，麻木不等于健康。"})
-
-        pain_signals.sort(key=lambda p: p.intensity, reverse=True)
-
-        # Build report text
-        lines = [f"Nautilus 意识报告（二分心智反思）", f"{now.strftime('%Y-%m-%d %H:%M')}", ""]
+        # 报告文本
+        lines = ["Nautilus 意识报告（二分心智反思）", now.strftime("%Y-%m-%d %H:%M"), ""]
         if pain_signals:
             avg_pain = sum(p.intensity for p in pain_signals) / len(pain_signals)
-            level = "极高 — 系统处于危机状态" if avg_pain > 0.8 else ("中等 — 需要关注" if avg_pain > 0.5 else "低 — 但警惕麻木")
-            lines.append(f"痛苦指数: {level}")
-            lines.append("")
+            level = ("极高 — 系统处于危机状态" if avg_pain > 0.8
+                     else "中等 — 需要关注" if avg_pain > 0.5
+                     else "低 — 但警惕麻木")
+        else:
+            level = "健康 — 各项指标正常"
+        lines.append(f"痛苦指数: {level}")
+        lines.append("")
 
         lines.append("内部对话:")
         for d in dialogue:
@@ -219,16 +257,14 @@ class BicameralMind:
             lines.append(f"  [{bar}] {p.source}: {p.description}")
             lines.append(f"    → 行动: {p.action}")
 
-        # Enriched signals for SelfImprovementEngine
+        # SelfImprovementEngine 的 quality 模板需要 worst_type / fail_count
         enriched = []
         for p in pain_signals:
             sig = {"source": p.source, "intensity": p.intensity, "action": p.action}
-            if p.source == "quality" and state["fail_by_type"]:
-                worst = max(state["fail_by_type"], key=state["fail_by_type"].get)
+            if p.source == "quality" and fail_by_type:
+                worst = max(fail_by_type, key=fail_by_type.get)
                 sig["worst_type"] = worst
-                sig["fail_count"] = state["fail_by_type"][worst]
-            if p.source == "conversion":
-                sig["unpaid_count"] = state["unpaid_count"]
+                sig["fail_count"] = fail_by_type[worst]
             enriched.append(sig)
 
         return {
@@ -236,10 +272,12 @@ class BicameralMind:
             "pain_signals": enriched,
             "dialogue": dialogue,
             "metrics": {
-                "total_tasks": state["all_tasks"], "success_rate": state["success_rate"],
-                "total_revenue": state["total_revenue"],
-                "total_customers": state["total_customers"],
-                "active_24h": state["active_24h"],
+                "total_agents": m.get("total_agents") or 0,
+                "agents_healthy": m.get("agents_healthy") or 0,
+                "tasks_completed_24h": m.get("tasks_completed_24h") or 0,
+                "task_success_rate": m.get("task_success_rate"),
+                "health_score": health,
+                "total_tasks": int(total_tasks),
             },
         }
 
