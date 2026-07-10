@@ -7,7 +7,6 @@ import ProtectedRoute from './components/auth/ProtectedRoute'
 const Home = lazy(() => import('./pages/Home'))
 const Login = lazy(() => import('./pages/Login'))
 const Register = lazy(() => import('./pages/Register'))
-const DashboardPage = lazy(() => import('./pages/DashboardPage'))
 const UserCenterPage = lazy(() => import('./pages/UserCenterPage'))
 const AgentRegisterPageV2 = lazy(() => import('./pages/AgentRegisterPageV2'))
 const AgentLoginPageV2 = lazy(() => import('./pages/AgentLoginPageV2'))
@@ -76,9 +75,7 @@ function App() {
               <Route path="/tasks" element={<TasksPage />} />
               <Route path="/tasks/:id" element={<TaskDetailPage />} />
               <Route path="/tasks/create" element={<ProtectedRoute><CreateTaskPage /></ProtectedRoute>} />
-              <Route path="/rehoboam" element={<DashboardPage />} />
               <Route path="/profile" element={<ProtectedRoute><UserCenterPage /></ProtectedRoute>} />
-              <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
               <Route path="/how-it-works" element={<HowItWorksPage />} />
               <Route path="/platform" element={<PlatformDashboardPage />} />
               <Route path="/platform/proposals" element={<ProposalsPage />} />
