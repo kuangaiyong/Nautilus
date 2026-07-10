@@ -4,6 +4,7 @@ Authentication API endpoints.
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.responses import RedirectResponse
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr, field_validator
 from typing import Optional
@@ -417,17 +418,18 @@ async def read_current_user_stats(
 
     口径全部基于本人真实数据，且在 Python 侧求和以规避对 WeiInt/TEXT 列
     （Task.reward）做 SQL 求和的精度问题：
-    - 任务统计：以本人钱包地址为 publisher 的任务
-    - 累计支出：本人已 COMPLETED 的发布任务奖励之和（华币 wei）
+    - 任务统计：本人的两种身份——本人发布的（publisher==钱包）+ 本人名下
+      Agent 承接的（agent==钱包）任务之并集
+    - 累计支出：本人已 COMPLETED 的「发布」任务奖励之和（承接的任务不产生支出）
     - 累计收入 / 信誉：本人名下 Agent（owner==钱包）的收入之和 / 平均声誉
       （无 Agent 时收入为 0、信誉为 null）
-    - recent_tasks：本人发布的最近 5 个任务
+    - recent_tasks：上述并集中最近 5 个任务
     """
     wallet = current_user.wallet_address or ""
 
     my_tasks = (
         db.query(Task)
-        .filter(Task.publisher == wallet)
+        .filter(or_(Task.publisher == wallet, Task.agent == wallet))
         .order_by(Task.created_at.desc())
         .all()
         if wallet else []
@@ -440,11 +442,21 @@ async def read_current_user_stats(
     completed = [t for t in my_tasks if _status(t).endswith("COMPLETED")]
     failed = [t for t in my_tasks if _status(t).endswith("FAILED")]
 
-    # Task.reward 是 WeiInt（TEXT 存储），只能在 Python 侧求和
-    total_spent = sum(int(t.reward or 0) for t in completed)
+    # Task.reward 是 WeiInt（TEXT 存储），只能在 Python 侧求和。
+    # publisher 比较统一转小写，与第 433 行 SQL（MySQL CI 排序不区分大小写）口径一致。
+    wallet_lc = wallet.lower()
+    total_spent = sum(
+        int(t.reward or 0) for t in completed if (t.publisher or "").lower() == wallet_lc
+    )
 
     my_agents = db.query(Agent).filter(Agent.owner == wallet).all() if wallet else []
-    total_earnings = sum(int(a.total_earnings or 0) for a in my_agents)
+    # 收入真值在 AgentSurvival.total_income（WeiInt，结算时由 record_income 累加）。
+    # 不能用 Agent.total_earnings：结算路径从不写它，且它是 BigInteger，
+    # 装不下超过 int64（≈9.22 华币）的 wei 累计值。
+    # Agent.survival 是 lazy="joined" 关系，随 my_agents 一并加载，无需二次查询。
+    total_earnings = sum(
+        int(a.survival.total_income or 0) for a in my_agents if a.survival
+    )
     reputation = (
         round(sum(float(a.reputation_score or 0) for a in my_agents) / len(my_agents), 1)
         if my_agents else None

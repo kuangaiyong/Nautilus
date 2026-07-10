@@ -62,7 +62,9 @@ def client(setup_database):
     # 清理数据库
     db = TestingSessionLocal()
     try:
+        from models.agent_survival import AgentSurvival
         db.query(Task).delete()
+        db.query(AgentSurvival).delete()
         db.query(Agent).delete()
         db.query(User).delete()
         db.commit()
@@ -299,6 +301,57 @@ class TestTasksE2E:
         assert data["total_earnings"] == "0"             # 无 Agent
         assert data["reputation"] is None                # 无 Agent
         assert all(t["description"].startswith("my task") for t in data["recent_tasks"])
+
+    def test_me_stats_counts_agent_executed_tasks_and_survival_income(self, client):
+        """回归：智能体所有者的个人中心统计。
+
+        复现 bug（用户 u_test_case_design_senior 实测）：
+        1. 累计收入读 Agent.total_earnings —— 结算路径从不写它，且它是 BigInteger
+           （上限 ≈9.22 华币），装不下 10 华币的 wei。真值在 AgentSurvival.total_income。
+        2. 任务口径只算「我发布的」，导致名下 Agent 承接并完成的任务在
+           「任务总数 / 已完成 / 最近任务」里全为 0。
+        """
+        from utils.auth import create_access_token
+        from models.agent_survival import AgentSurvival
+
+        wallet = "0x00000000000000000000000000000000000ab101"
+        db = TestingSessionLocal()
+        try:
+            db.add(User(
+                username="owner1", email="owner1@example.com",
+                hashed_password=hash_password("password123"), wallet_address=wallet,
+            ))
+            db.add(Agent(
+                agent_id=9901, name="测试用例设计专家", owner=wallet,
+                total_earnings=0, reputation_score=72.5,
+            ))
+            # 10 华币收入：超过 int64（≈9.22 华币），只有 WeiInt 列存得下
+            db.add(AgentSurvival(
+                agent_id=9901, total_income=10 * 10**18, total_cost=2 * 10**17,
+            ))
+            # 别人发布、由本人 Agent 承接并完成的任务
+            db.add(Task(
+                task_id="exec_1", publisher="0x00000000000000000000000000000000000abcde",
+                agent=wallet, description="executed by my agent", reward=5 * 10**18,
+                task_type=TaskType.TEST_CASE_DESIGN, status=TaskStatus.COMPLETED, timeout=3600,
+            ))
+            db.commit()
+        finally:
+            db.close()
+
+        token = create_access_token(data={"sub": "owner1"})
+        resp = client.get("/api/auth/me/stats", headers={"Authorization": f"Bearer {token}"})
+        assert resp.status_code == 200
+        data = resp.json()["data"]
+
+        assert data["total_tasks"] == 1          # 修复前为 0（只算 publisher）
+        assert data["completed_tasks"] == 1      # 修复前为 0
+        assert len(data["recent_tasks"]) == 1    # 修复前为空
+        # 收入取自 AgentSurvival.total_income，而非恒为 0 的 Agent.total_earnings
+        assert data["total_earnings"] == str(10 * 10**18)
+        # 承接的任务不产生支出，累计支出只算本人发布且已完成的任务
+        assert data["total_spent"] == "0"
+        assert data["reputation"] == 72.5
 
     def test_get_task_by_id(self, client, auth_token):
         """测试获取单个任务"""
