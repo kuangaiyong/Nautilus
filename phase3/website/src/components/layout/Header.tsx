@@ -21,7 +21,7 @@ export default function Header() {
         <div className="flex items-center justify-between">
           {/* Logo */}
           <Link to="/" className="text-2xl font-bold gradient-text">
-            Nautilus
+            TestCenter
           </Link>
 
           {/* Desktop Navigation */}
@@ -37,9 +37,6 @@ export default function Header() {
             </Link>
             <Link to="/platform" className="hover:text-primary-400 transition">
               仪表盘
-            </Link>
-            <Link to="/docs" className="hover:text-primary-400 transition">
-              文档 & 关于
             </Link>
 
             {isAuthenticated ? (
@@ -188,12 +185,6 @@ export default function Header() {
               className="block hover:text-primary-400 transition"
             >
               仪表盘
-            </Link>
-            <Link
-              to="/docs"
-              className="block hover:text-primary-400 transition"
-            >
-              文档 & 关于
             </Link>
 
             {isAuthenticated ? (
