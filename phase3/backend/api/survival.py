@@ -1,7 +1,7 @@
 """
 生存机制API接口
 """
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from typing import Optional, List
 from pydantic import BaseModel, Field
@@ -10,11 +10,29 @@ from datetime import datetime
 from utils.database import get_db
 from utils.auth import get_current_user, get_current_agent
 from models.agent_survival import AgentSurvival, AgentTransaction, AgentPenalty
+from models.database import Agent
 from services.survival_service import SurvivalService
 import logging
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+
+def _authorize_agent_owner(db: Session, agent_id: int, current_user):
+    """校验当前用户是该 agent 的所有者（或管理员），否则 403。
+
+    收支写入会改变对外展示的收入/成本与生存等级，必须限定归属，
+    防止任意登录用户伪造他人 agent 的财务数据。
+    """
+    if getattr(current_user, "is_admin", False):
+        return
+    agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
+    wallet = (getattr(current_user, "wallet_address", None) or "").lower()
+    if agent is None or (agent.owner or "").lower() != wallet:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not own this agent / 你无权操作该智能体",
+        )
 
 
 # Request/Response Models
@@ -99,6 +117,7 @@ async def update_agent_survival(
     - 重新判断生存等级
     - 重新判断状态
     """
+    _authorize_agent_owner(db, agent_id, current_user)
     try:
         survival = SurvivalService.update_agent_survival(
             db=db,
@@ -194,6 +213,7 @@ async def record_income(
     - ROI
     - 生存等级
     """
+    _authorize_agent_owner(db, agent_id, current_user)
     try:
         transaction = SurvivalService.record_income(
             db=db,
@@ -234,6 +254,7 @@ async def record_cost(
     - ROI
     - 生存等级
     """
+    _authorize_agent_owner(db, agent_id, current_user)
     try:
         transaction = SurvivalService.record_cost(
             db=db,
