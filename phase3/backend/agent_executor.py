@@ -124,7 +124,15 @@ async def execute_task_by_agent(
         result_state = await engine.graph.ainvoke(state)
         # LangGraph 的 ainvoke 返回 dict（各 channel 的值），转回 AgentState 以便属性访问
         if isinstance(result_state, dict):
-            result_state = AgentState(**result_state)
+            # Validate required fields exist before reconstructing AgentState
+            required_fields = {"task_id", "task_type", "description", "result"}
+            missing_fields = required_fields - set(result_state.keys())
+            if missing_fields:
+                raise ValueError(f"LLM response missing required fields: {missing_fields}")
+            try:
+                result_state = AgentState(**result_state)
+            except TypeError as e:
+                raise ValueError(f"Failed to reconstruct AgentState from LLM response: {e}")
 
         end_time = datetime.now(timezone.utc)
         execution_time = (end_time - start_time).total_seconds()

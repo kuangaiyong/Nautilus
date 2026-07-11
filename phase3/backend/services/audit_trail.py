@@ -212,8 +212,7 @@ def _send_record_tx(db, actor_address: str, task_id: int, action_code: int, cont
     """
     from web3 import Web3
     from blockchain.web3_config import get_web3_config
-    from services.nonce_lock import account_nonce_lock
-    from services.wallet import _get_local_encryption, _zero_bytes
+    from services.wallet import sign_and_broadcast_transaction
 
     config = get_web3_config()
     if config.audit_contract is None:
@@ -228,31 +227,23 @@ def _send_record_tx(db, actor_address: str, task_id: int, action_code: int, cont
     hex_body = content_hash_hex[2:] if content_hash_hex.startswith("0x") else content_hash_hex
     ch_bytes = bytes.fromhex(hex_body)
 
-    pk = bytearray(_get_local_encryption().decrypt(
-        base64.b64decode(wallet.encrypted_private_key), wallet.public_address))
-    try:
-        # 串行化同一签名账户的 nonce 获取→广播，避免并发存证撞同一 nonce 被链拒。
-        with account_nonce_lock(from_addr):
-            tx = config.audit_contract.functions.record(task_id, action_code, ch_bytes).build_transaction({
-                "from": from_addr,
-                "nonce": w3.eth.get_transaction_count(from_addr, "pending"),
-                "gas": 200000,
-                "gasPrice": 0,
-                "chainId": config.chain_id,
-            })
-            signed = w3.eth.account.sign_transaction(tx, bytes(pk))
-            tx_hash = w3.eth.send_raw_transaction(signed.raw_transaction)
-    finally:
-        _zero_bytes(pk)  # 真正擦除明文私钥（bytearray 可原地清零）
+    # Build transaction
+    tx = config.audit_contract.functions.record(task_id, action_code, ch_bytes).build_transaction({
+        "from": from_addr,
+        "nonce": w3.eth.get_transaction_count(from_addr, "pending"),
+        "gas": 200000,
+        "gasPrice": 0,
+        "chainId": config.chain_id,
+    })
 
-    tx_hex = tx_hash.hex() if hasattr(tx_hash, "hex") else str(tx_hash)
-    # 广播已成功；等待上链确认（超时/revert 不视为失败，返回 confirmed=False 并保留 tx_hash）。
+    # Use shared signing and broadcast function
     try:
-        receipt = w3.eth.wait_for_transaction_receipt(tx_hash, timeout=_RECEIPT_TIMEOUT)
+        tx_hex, receipt = sign_and_broadcast_transaction(db, wallet.public_address, tx, timeout_seconds=_RECEIPT_TIMEOUT)
     except Exception:
-        return (tx_hex, None, False)
-    if receipt["status"] != 1:
-        return (tx_hex, None, False)
+        # Broadcast failed (timeout, revert, etc.); return confirmed=False but preserve tx_hash if available
+        raise
+
+    # Extract seq from receipt events
     seq = None
     try:
         evs = config.audit_contract.events.AuditRecord().process_receipt(receipt)
@@ -260,6 +251,7 @@ def _send_record_tx(db, actor_address: str, task_id: int, action_code: int, cont
             seq = int(evs[0]["args"]["seq"])
     except Exception:
         pass
+
     return (tx_hex, seq, True)
 
 

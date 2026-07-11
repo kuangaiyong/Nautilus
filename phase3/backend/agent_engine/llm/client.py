@@ -25,9 +25,16 @@ class LLMClient:
         model: Optional[str] = None,
     ):
         self.model = model or os.getenv("LLM_MODEL", self.DEFAULT_MODEL)
-        # 统一走私有大模型网关（OpenAI 兼容）；api_key/base_url 由 llm_gateway 管理。
-        self.client = get_anthropic_compatible_client()
-        logger.info("LLMClient initialized via llm_gateway, model=%s", self.model)
+        # Validate LLM gateway configuration at startup, fail-fast if keys missing
+        try:
+            self.client = get_anthropic_compatible_client()
+            # Verify client is actually configured (not None)
+            if self.client is None:
+                raise RuntimeError("LLM gateway returned None client")
+            logger.info("LLMClient initialized via llm_gateway, model=%s", self.model)
+        except Exception as e:
+            logger.error("LLM client initialization failed: %s", e)
+            raise RuntimeError(f"Failed to initialize LLM client at startup: {e}") from e
 
     def chat(
         self,

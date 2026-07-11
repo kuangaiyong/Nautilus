@@ -185,10 +185,19 @@ async def register_agent(
             encrypted_key = encryption.encrypt(acct.key, generated_address)
 
             import bcrypt
-            # bcrypt only considers the first 72 bytes; truncate to stay within its hard limit.
-            mnemonic_hash = bcrypt.hashpw(
-                mnemonic_phrase.encode("utf-8")[:72], bcrypt.gensalt()
-            ).decode("utf-8")
+            # Hash full mnemonic; bcrypt truncates at 72 bytes internally, but we hash the complete phrase
+            # to avoid collisions between phrases differing only after byte 72.
+            mnemonic_bytes = mnemonic_phrase.encode("utf-8")
+            if len(mnemonic_bytes) > 72:
+                # For phrases longer than 72 bytes, use SHA256 first to preserve full entropy
+                import hashlib
+                mnemonic_hash = bcrypt.hashpw(
+                    hashlib.sha256(mnemonic_bytes).digest(), bcrypt.gensalt()
+                ).decode("utf-8")
+            else:
+                mnemonic_hash = bcrypt.hashpw(
+                    mnemonic_bytes, bcrypt.gensalt()
+                ).decode("utf-8")
 
             wallet_record = Wallet(
                 wallet_id=str(uuid.uuid4()),

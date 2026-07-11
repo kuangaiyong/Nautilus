@@ -12,10 +12,11 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-@cached(ttl=120, key_prefix="tasks")
-async def get_tasks_cached(status: str = None, task_type: str = None, skip: int = 0, limit: int = 20, db: Session = None) -> dict:
+def get_tasks_cached(status: str = None, task_type: str = None, skip: int = 0, limit: int = 20, db: Session = None) -> dict:
     """
     Get tasks list with caching (2 minutes).
+
+    NOTE: Session must NOT be included in cache key; use pool_id instead.
 
     Args:
         status: Filter by task status (optional)
@@ -27,6 +28,20 @@ async def get_tasks_cached(status: str = None, task_type: str = None, skip: int 
     Returns:
         dict: List of tasks
     """
+    # Build cache key without including the Session object
+    cache_key = f"tasks:status={status}:type={task_type}:skip={skip}:limit={limit}"
+
+    # Check cache first
+    from utils.cache import redis_client
+    try:
+        cached_result = redis_client.get(cache_key)
+        if cached_result:
+            import json
+            return json.loads(cached_result)
+    except Exception as e:
+        logger.warning(f"Cache lookup failed: {e}")
+
+    # Cache miss or error; query database
     query = db.query(Task)
 
     if status:
@@ -37,9 +52,9 @@ async def get_tasks_cached(status: str = None, task_type: str = None, skip: int 
 
     tasks = query.order_by(Task.created_at.desc()).offset(skip).limit(limit).all()
 
-    task_queries.labels(cached='hit').inc()
+    task_queries.labels(cached='miss').inc()
 
-    return {
+    result = {
         "tasks": [
             {
                 "id": task.id,
@@ -54,11 +69,11 @@ async def get_tasks_cached(status: str = None, task_type: str = None, skip: int 
                 "agent": task.agent,
                 "result": task.result,
                 "timeout": task.timeout,
-                "created_at": task.created_at,
-                "accepted_at": task.accepted_at,
-                "submitted_at": task.submitted_at,
-                "verified_at": task.verified_at,
-                "completed_at": task.completed_at,
+                "created_at": task.created_at.isoformat() if task.created_at else None,
+                "accepted_at": task.accepted_at.isoformat() if task.accepted_at else None,
+                "submitted_at": task.submitted_at.isoformat() if task.submitted_at else None,
+                "verified_at": task.verified_at.isoformat() if task.verified_at else None,
+                "completed_at": task.completed_at.isoformat() if task.completed_at else None,
                 "blockchain_tx_hash": task.blockchain_tx_hash,
                 "blockchain_accept_tx": task.blockchain_accept_tx,
                 "blockchain_submit_tx": task.blockchain_submit_tx,
@@ -71,6 +86,15 @@ async def get_tasks_cached(status: str = None, task_type: str = None, skip: int 
             for task in tasks
         ]
     }
+
+    # Cache the result (TTL 120 seconds)
+    try:
+        import json
+        redis_client.setex(cache_key, 120, json.dumps(result))
+    except Exception as e:
+        logger.warning(f"Failed to cache result: {e}")
+
+    return result
 
 
 def invalidate_tasks_cache():
