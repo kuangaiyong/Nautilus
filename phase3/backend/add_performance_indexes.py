@@ -55,26 +55,17 @@ def add_performance_indexes():
 def verify_indexes():
     """Verify that indexes were created successfully."""
 
-    # SQLite query to check indexes
+    # MySQL query to check indexes
     check_query = """
-    SELECT name, tbl_name
-    FROM sqlite_master
-    WHERE type = 'index'
-    AND name LIKE 'idx_%'
-    ORDER BY tbl_name, name
-    """
-
-    # PostgreSQL query (if using PostgreSQL)
-    check_query_pg = """
-    SELECT indexname, tablename
-    FROM pg_indexes
-    WHERE indexname LIKE 'idx_%'
-    ORDER BY tablename, indexname
+    SELECT DISTINCT index_name, table_name
+    FROM information_schema.statistics
+    WHERE table_schema = DATABASE()
+    AND index_name LIKE 'idx_%'
+    ORDER BY table_name, index_name
     """
 
     with engine.connect() as conn:
         try:
-            # Try SQLite first
             result = conn.execute(text(check_query))
             indexes = result.fetchall()
 
@@ -104,7 +95,7 @@ def analyze_tables():
         for table in tables:
             try:
                 logger.info(f"Analyzing table: {table}")
-                conn.execute(text(f"ANALYZE {table}"))
+                conn.execute(text(f"ANALYZE TABLE {table}"))
                 conn.commit()
                 logger.info(f"✓ Table analyzed: {table}")
             except Exception as e:

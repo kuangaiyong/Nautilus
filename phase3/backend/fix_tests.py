@@ -17,20 +17,15 @@ def init_test_database():
     """初始化测试数据库"""
     print("🔧 初始化测试数据库...")
 
-    # 设置测试环境变量
-    os.environ["DATABASE_URL"] = "sqlite:///./test.db"
+    # 设置测试环境变量（MySQL 测试库 nautilus_test）
+    from tests.testdb import TEST_DATABASE_URL
+    os.environ["DATABASE_URL"] = TEST_DATABASE_URL
     os.environ["TESTING"] = "true"
 
     from models.database import Base, engine
 
-    # 删除旧数据库
-    test_db_files = ["test.db", "test_nautilus.db", "test_gas_api.db"]
-    for db_file in test_db_files:
-        if os.path.exists(db_file):
-            os.remove(db_file)
-            print(f"✅ 已删除旧数据库: {db_file}")
-
-    # 创建新数据库
+    # 先清后建，保证干净
+    Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
     print(f"✅ 已创建新数据库表")
 

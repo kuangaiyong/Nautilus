@@ -9,6 +9,7 @@ from sqlalchemy.orm import sessionmaker
 from datetime import datetime, timezone
 from unittest.mock import Mock, patch
 
+from tests.testdb import TEST_DATABASE_URL
 from main import app
 from models.database import Base, Task, TaskStatus, TaskType, User, Agent
 from utils.database import get_db
@@ -16,8 +17,8 @@ from utils.auth import create_access_token
 
 
 # 测试数据库设置
-SQLALCHEMY_DATABASE_URL = "sqlite:///./test_gas_api.db"
-engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
+SQLALCHEMY_DATABASE_URL = TEST_DATABASE_URL
+engine = create_engine(SQLALCHEMY_DATABASE_URL)
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
@@ -37,6 +38,7 @@ client = TestClient(app)
 @pytest.fixture(scope="function")
 def setup_database():
     """Setup test database"""
+    Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
     yield
     Base.metadata.drop_all(bind=engine)

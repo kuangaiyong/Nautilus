@@ -5,6 +5,7 @@ import pytest
 from datetime import datetime, timedelta
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
+from tests.testdb import TEST_DATABASE_URL
 from models.epiplexity import KnowledgeNode, KnowledgeTransfer, EpiplexityMeasure
 from models.agent_survival import AgentSurvival
 from models.agent_v2 import AgentV2, Base as AgentBase
@@ -14,8 +15,8 @@ from services.knowledge_visualization_service import KnowledgeVisualizationServi
 
 
 # Test database setup
-SQLALCHEMY_DATABASE_URL = "sqlite:///./test_knowledge_visualization.db"
-engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
+SQLALCHEMY_DATABASE_URL = TEST_DATABASE_URL
+engine = create_engine(SQLALCHEMY_DATABASE_URL)
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 

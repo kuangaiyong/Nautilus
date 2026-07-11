@@ -8,23 +8,19 @@ from fastapi.testclient import TestClient
 from fastapi import FastAPI
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
-from sqlalchemy.pool import StaticPool
 import sys
 import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from tests.testdb import TEST_DATABASE_URL
 
 from models.database import Base, User
 from utils.database import get_db
 from api.auth import router as auth_router
 
 
-# 创建测试引擎（使用StaticPool确保所有连接使用同一个内存数据库）
-engine = create_engine(
-    "sqlite:///:memory:",
-    connect_args={"check_same_thread": False},
-    poolclass=StaticPool
-)
+# 创建测试引擎（连 MySQL 测试库 nautilus_test）
+engine = create_engine(TEST_DATABASE_URL)
 
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
@@ -41,6 +37,7 @@ def override_get_db():
 @pytest.fixture(scope="module")
 def setup_database():
     """设置测试数据库"""
+    Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
     yield
     Base.metadata.drop_all(bind=engine)
@@ -248,9 +245,10 @@ class TestAuthE2E:
 
         assert response.status_code == 200
         data = response.json()
-        assert data["username"] == "testuser"
-        assert data["email"] == "test@example.com"
-        assert "wallet_address" in data
+        user = data["data"]["user"]
+        assert user["username"] == "testuser"
+        assert user["email"] == "test@example.com"
+        assert "wallet_address" in user
 
     def test_get_current_user_unauthorized(self, client):
         """测试未授权获取用户信息"""

@@ -21,9 +21,9 @@ from utils.database import get_db
 from utils.auth import hash_password, generate_api_key
 
 
-# Test database setup
-TEST_DATABASE_URL = "sqlite:///./benchmark.db"
-engine = create_engine(TEST_DATABASE_URL, connect_args={"check_same_thread": False})
+# Test database setup（MySQL 测试库）
+from tests.testdb import TEST_DATABASE_URL
+engine = create_engine(TEST_DATABASE_URL)
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 

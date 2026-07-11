@@ -12,6 +12,7 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
+from tests.testdb import TEST_DATABASE_URL
 from models.database import Base, Agent
 import models.agent_survival  # noqa: F401  registers AgentSurvival mapper for Agent.survival
 from utils.cache import invalidate_cache
@@ -25,8 +26,9 @@ from services.agent_service import (
 @pytest.fixture
 def db_session():
     engine = create_engine(
-        "sqlite:///:memory:", connect_args={"check_same_thread": False}
+        TEST_DATABASE_URL
     )
+    Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
     session = sessionmaker(bind=engine)()
     session.add_all([

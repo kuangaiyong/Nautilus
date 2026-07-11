@@ -24,9 +24,9 @@ from utils.auth import hash_password, generate_api_key
 from utils.cache import get_cache
 
 
-# Test database setup
-TEST_DATABASE_URL = "sqlite:///./test_performance.db"
-engine = create_engine(TEST_DATABASE_URL, connect_args={"check_same_thread": False})
+# Test database setup（MySQL 测试库）
+from tests.testdb import TEST_DATABASE_URL
+engine = create_engine(TEST_DATABASE_URL)
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
@@ -131,7 +131,9 @@ def check_database_indexes():
     db = TestingSessionLocal()
 
     # Check for indexes
-    result = db.execute(text("SELECT name FROM sqlite_master WHERE type='index'"))
+    result = db.execute(text(
+        "SELECT DISTINCT index_name FROM information_schema.statistics "
+        "WHERE table_schema = DATABASE()"))
     indexes = [row[0] for row in result]
 
     performance_indexes = [idx for idx in indexes if 'idx_' in idx]

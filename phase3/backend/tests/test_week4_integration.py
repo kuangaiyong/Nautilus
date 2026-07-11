@@ -6,6 +6,7 @@ import pytest
 from datetime import datetime, timedelta
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from tests.testdb import TEST_DATABASE_URL
 from models.database import Base as DatabaseBase, Agent, Task
 from models.epiplexity import Base as EpiplexityBase, KnowledgeNode, KnowledgeTransfer
 from models.agent_survival import Base as SurvivalBase, AgentSurvival, AgentTransaction
@@ -19,7 +20,7 @@ from services.learning_tracking_service import LearningTrackingService
 @pytest.fixture(scope="function")
 def test_db():
     """创建测试数据库"""
-    engine = create_engine("sqlite:///:memory:")
+    engine = create_engine(TEST_DATABASE_URL)
 
     # 创建所有表
     DatabaseBase.metadata.create_all(engine)

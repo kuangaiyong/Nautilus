@@ -8,35 +8,30 @@ from dotenv import load_dotenv
 load_dotenv()
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
-from sqlalchemy.pool import StaticPool
 from contextlib import contextmanager
 from typing import Generator
 import os
 
 from models.database import Base
 
-# Get database URL from environment
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./nautilus.db")
+# 私有化部署固定使用 MySQL：DATABASE_URL 必须显式配置（.env），不再提供 SQLite 兜底
+DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    raise RuntimeError(
+        "DATABASE_URL 未设置。私有化部署使用 MySQL，例如 "
+        "mysql+pymysql://user:pass@127.0.0.1:3306/nautilus_private?charset=utf8mb4"
+    )
 
-# Create engine with SQLite-specific configuration
-if DATABASE_URL.startswith("sqlite"):
-    engine = create_engine(
-        DATABASE_URL,
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-        echo=os.getenv("DEBUG", "false").lower() == "true"
-    )
-else:
-    # PostgreSQL/MySQL configuration with optimized connection pool
-    engine = create_engine(
-        DATABASE_URL,
-        pool_pre_ping=True,  # Verify connections before using
-        pool_size=int(os.getenv("DATABASE_POOL_SIZE", "20")),  # Increased from 10
-        max_overflow=int(os.getenv("DATABASE_MAX_OVERFLOW", "40")),  # Increased from 20
-        pool_recycle=int(os.getenv("DATABASE_POOL_RECYCLE", "3600")),  # Recycle after 1 hour
-        pool_timeout=int(os.getenv("DATABASE_POOL_TIMEOUT", "30")),  # Wait 30s for connection
-        echo=os.getenv("DEBUG", "false").lower() == "true"
-    )
+# MySQL configuration with optimized connection pool
+engine = create_engine(
+    DATABASE_URL,
+    pool_pre_ping=True,  # Verify connections before using
+    pool_size=int(os.getenv("DATABASE_POOL_SIZE", "20")),  # Increased from 10
+    max_overflow=int(os.getenv("DATABASE_MAX_OVERFLOW", "40")),  # Increased from 20
+    pool_recycle=int(os.getenv("DATABASE_POOL_RECYCLE", "3600")),  # Recycle after 1 hour
+    pool_timeout=int(os.getenv("DATABASE_POOL_TIMEOUT", "30")),  # Wait 30s for connection
+    echo=os.getenv("DEBUG", "false").lower() == "true"
+)
 
 # Create session factory
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

@@ -13,6 +13,7 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
+from tests.testdb import TEST_DATABASE_URL
 from models.database import Base, User, Wallet
 import models.agent_survival  # noqa: F401  registers Agent mapper relationships
 from services.wallet import ensure_user_wallet, _get_local_encryption
@@ -21,8 +22,9 @@ from services.wallet import ensure_user_wallet, _get_local_encryption
 @pytest.fixture
 def db():
     engine = create_engine(
-        "sqlite:///:memory:", connect_args={"check_same_thread": False}
+        TEST_DATABASE_URL
     )
+    Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
     session = sessionmaker(bind=engine)()
     yield session

@@ -1,7 +1,7 @@
 """
-PostgreSQL集成测试
+数据库集成测试
 
-使用实际PostgreSQL数据库测试API端点
+使用 MySQL 测试库（nautilus_test）测试 API 端点。
 """
 import pytest
 from fastapi.testclient import TestClient
@@ -18,65 +18,21 @@ from utils.database import get_db
 from main import app
 
 
-# 测试数据库配置 - 使用SQLite作为后备
-TEST_DATABASE_URL = os.environ.get('TEST_DATABASE_URL', 'sqlite:///./test_postgres.db')
-
-# 检查PostgreSQL是否可用
-def check_postgres_available():
-    """检查PostgreSQL是否可用"""
-    postgres_url = 'postgresql://postgres:postgres@localhost:5432/nautilus_test'
-    try:
-        engine = create_engine(postgres_url)
-        conn = engine.connect()
-        conn.close()
-        return True
-    except Exception:
-        return False
-
-POSTGRES_AVAILABLE = check_postgres_available()
-
-# 如果PostgreSQL可用，使用PostgreSQL，否则使用SQLite
-if POSTGRES_AVAILABLE:
-    TEST_DATABASE_URL = 'postgresql://postgres:postgres@localhost:5432/nautilus_test'
-else:
-    TEST_DATABASE_URL = 'sqlite:///./test_postgres.db'
+# 测试数据库：私有化部署用 MySQL，测试走独立的 nautilus_test 库
+from tests.testdb import TEST_DATABASE_URL
 
 
 @pytest.fixture(scope="module")
 def test_engine():
-    """创建测试数据库引擎"""
-    # 如果是SQLite，先删除旧的测试数据库
-    if TEST_DATABASE_URL.startswith('sqlite'):
-        db_file = TEST_DATABASE_URL.replace('sqlite:///', '')
-        if os.path.exists(db_file):
-            try:
-                os.remove(db_file)
-            except PermissionError:
-                pass  # File in use, will be cleaned up later
-
-    # 创建测试引擎
-    if TEST_DATABASE_URL.startswith('sqlite'):
-        engine = create_engine(TEST_DATABASE_URL, connect_args={"check_same_thread": False})
-    else:
-        engine = create_engine(TEST_DATABASE_URL)
-
-    # 创建所有表
+    """创建测试数据库引擎（MySQL 测试库，先清后建保证干净）"""
+    engine = create_engine(TEST_DATABASE_URL)
+    Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
 
     yield engine
 
-    # 清理测试数据
     Base.metadata.drop_all(bind=engine)
     engine.dispose()
-
-    # 如果是SQLite，删除测试数据库文件
-    if TEST_DATABASE_URL.startswith('sqlite'):
-        db_file = TEST_DATABASE_URL.replace('sqlite:///', '')
-        if os.path.exists(db_file):
-            try:
-                os.remove(db_file)
-            except PermissionError:
-                pass  # File in use, will be cleaned up later
 
 
 @pytest.fixture(scope="module")

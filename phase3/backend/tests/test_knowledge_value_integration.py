@@ -2,6 +2,7 @@
 测试知识价值集成到评分系统
 """
 import pytest
+from tests.testdb import TEST_DATABASE_URL
 from services.survival_service import SurvivalService
 from models.epiplexity import KnowledgeNode, KnowledgeTransfer
 from datetime import datetime
@@ -270,7 +271,7 @@ def db_session():
     from models.epiplexity import Base as EpiplexityBase
 
     # 只创建Epiplexity相关的表
-    engine = create_engine("sqlite:///:memory:")
+    engine = create_engine(TEST_DATABASE_URL)
     EpiplexityBase.metadata.create_all(engine)
 
     SessionLocal = sessionmaker(bind=engine)

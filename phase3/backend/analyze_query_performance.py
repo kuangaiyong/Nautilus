@@ -116,18 +116,16 @@ def check_indexes():
 
     with engine.connect() as conn:
         try:
-            # SQLite query
+            # MySQL query
             result = conn.execute(text("""
                 SELECT
-                    m.name as table_name,
-                    il.name as index_name,
-                    GROUP_CONCAT(ii.name) as columns
-                FROM sqlite_master AS m,
-                     pragma_index_list(m.name) AS il,
-                     pragma_index_info(il.name) AS ii
-                WHERE m.type = 'table'
-                GROUP BY m.name, il.name
-                ORDER BY m.name, il.name
+                    table_name AS table_name,
+                    index_name AS index_name,
+                    GROUP_CONCAT(column_name ORDER BY seq_in_index) AS columns
+                FROM information_schema.statistics
+                WHERE table_schema = DATABASE()
+                GROUP BY table_name, index_name
+                ORDER BY table_name, index_name
             """))
 
             current_table = None

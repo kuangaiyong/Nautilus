@@ -14,7 +14,6 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -23,13 +22,10 @@ from models.agent_survival import AgentSurvival
 from utils.database import get_db
 from utils.auth import hash_password, create_access_token
 from api.survival import router as survival_router
+from tests.testdb import TEST_DATABASE_URL
 
 
-engine = create_engine(
-    "sqlite:///:memory:",
-    connect_args={"check_same_thread": False},
-    poolclass=StaticPool,
-)
+engine = create_engine(TEST_DATABASE_URL)
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
@@ -43,6 +39,7 @@ def _override_get_db():
 
 @pytest.fixture
 def client():
+    Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
     app = FastAPI()
     app.include_router(survival_router, prefix="/api")

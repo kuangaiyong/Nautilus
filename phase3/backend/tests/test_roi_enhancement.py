@@ -2,6 +2,7 @@
 测试ROI增强计算（包含知识价值收益）
 """
 import pytest
+from tests.testdb import TEST_DATABASE_URL
 from services.financial_service import FinancialService
 from models.epiplexity import KnowledgeNode, KnowledgeTransfer
 from datetime import datetime, timedelta
@@ -318,7 +319,7 @@ def db_session():
     from sqlalchemy.orm import sessionmaker
     from models.epiplexity import Base as EpiplexityBase
 
-    engine = create_engine("sqlite:///:memory:")
+    engine = create_engine(TEST_DATABASE_URL)
     EpiplexityBase.metadata.create_all(engine)
 
     SessionLocal = sessionmaker(bind=engine)

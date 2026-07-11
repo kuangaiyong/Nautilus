@@ -10,17 +10,17 @@ complete_task，聚焦「筛选哪些任务 + limit + 异常隔离 + 状态统�
 """
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from tests.testdb import TEST_DATABASE_URL
 from datetime import datetime
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
 
 from models.database import Base, Task, User, TaskType, TaskStatus
 import api.tasks as api_tasks
 import services.se_pouw_flow as flow
 
 engine = create_engine(
-    "sqlite:///:memory:", connect_args={"check_same_thread": False}, poolclass=StaticPool
+    TEST_DATABASE_URL
 )
 TestingSessionLocal = sessionmaker(bind=engine)
 
@@ -30,6 +30,7 @@ import pytest
 
 @pytest.fixture
 def db():
+    Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
     s = TestingSessionLocal()
     try:

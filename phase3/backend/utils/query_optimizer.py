@@ -429,36 +429,23 @@ def analyze_query_plan(session: Session, query: Query) -> Dict[str, Any]:
         compile_kwargs={"literal_binds": True}
     ))
 
-    # 执行EXPLAIN
+    # 执行EXPLAIN（MySQL）
     try:
-        # PostgreSQL
-        explain_query = f"EXPLAIN (FORMAT JSON, ANALYZE) {sql}"
+        explain_query = f"EXPLAIN FORMAT=JSON {sql}"
         result = session.execute(text(explain_query))
         plan = result.fetchone()[0]
 
         return {
             'sql': sql,
             'plan': plan,
-            'database': 'postgresql'
+            'database': 'mysql'
         }
     except Exception as e:
-        try:
-            # SQLite
-            explain_query = f"EXPLAIN QUERY PLAN {sql}"
-            result = session.execute(text(explain_query))
-            plan = [dict(row) for row in result]
-
-            return {
-                'sql': sql,
-                'plan': plan,
-                'database': 'sqlite'
-            }
-        except Exception as e2:
-            logger.error(f"Failed to analyze query plan: {e2}")
-            return {
-                'sql': sql,
-                'error': str(e2)
-            }
+        logger.error(f"Failed to analyze query plan: {e}")
+        return {
+            'sql': sql,
+            'error': str(e)
+        }
 
 
 def suggest_indexes(session: Session, model) -> List[Dict[str, Any]]:

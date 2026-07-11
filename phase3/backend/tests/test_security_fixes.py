@@ -9,6 +9,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime
 
+from tests.testdb import TEST_DATABASE_URL
 from main import app
 from models.database import Base, User, Agent
 from utils.database import get_db
@@ -17,8 +18,8 @@ from agent_engine.executors.compute_executor import ComputeExecutor
 
 
 # Test database setup
-SQLALCHEMY_DATABASE_URL = "sqlite:///./test_security.db"
-engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
+SQLALCHEMY_DATABASE_URL = TEST_DATABASE_URL
+engine = create_engine(SQLALCHEMY_DATABASE_URL)
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
@@ -37,6 +38,7 @@ app.dependency_overrides[get_db] = override_get_db
 @pytest.fixture(scope="function")
 def test_db():
     """Create test database."""
+    Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
     yield
     Base.metadata.drop_all(bind=engine)

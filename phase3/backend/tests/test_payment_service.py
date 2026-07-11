@@ -11,6 +11,7 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
+from tests.testdb import TEST_DATABASE_URL
 from models.database import Base
 import models.payment  # noqa: F401  registers CreditAccount/CreditTransaction
 import models.agent_survival  # noqa: F401  registers AgentSurvival for Agent mapper config
@@ -20,8 +21,9 @@ from services.payment_service import PaymentService, InsufficientBalanceError
 @pytest.fixture
 def db():
     engine = create_engine(
-        "sqlite:///:memory:", connect_args={"check_same_thread": False}
+        TEST_DATABASE_URL
     )
+    Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
     session = sessionmaker(bind=engine)()
     yield session

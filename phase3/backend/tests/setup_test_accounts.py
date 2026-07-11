@@ -17,8 +17,10 @@ Run: C:/nautilus-venv/Scripts/python.exe tests/setup_test_accounts.py
 import os
 import sys
 import time
-import sqlite3
 import secrets
+
+# Add parent directory to path for imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import requests
 from dotenv import load_dotenv
@@ -29,8 +31,6 @@ load_dotenv()
 API = os.getenv("E2E_API", "http://127.0.0.1:8000")
 RPC = os.getenv("PRIVATE_RPC", "http://127.0.0.1:8545")
 HUA = Web3.to_checksum_address(os.getenv("HUA_TOKEN_ADDRESS"))
-DB_URL = os.getenv("DATABASE_URL", "sqlite:///./nautilus_private.db")
-DB_PATH = DB_URL.replace("sqlite:///", "").lstrip("./") or "nautilus_private.db"
 
 BAL_ABI = [{"inputs": [{"name": "a", "type": "address"}], "name": "balanceOf",
             "outputs": [{"name": "", "type": "uint256"}], "stateMutability": "view",
@@ -69,14 +69,17 @@ def auth(t):
 
 
 def me(token):
-    return requests.get(f"{API}/api/wallets/me", headers=auth(token)).json()
+    r = requests.get(f"{API}/api/wallets/me", headers=auth(token))
+    r.raise_for_status()
+    return r.json()
 
 
 def promote(username):
-    con = sqlite3.connect(DB_PATH)
-    con.execute("UPDATE users SET is_admin = 1 WHERE username = ?", (username,))
-    con.commit()
-    con.close()
+    # 经应用引擎（DATABASE_URL=MySQL）执行原生 SQL，不再依赖 sqlite3
+    from sqlalchemy import text
+    from utils.database import engine
+    with engine.begin() as cx:
+        cx.execute(text("UPDATE users SET is_admin = 1 WHERE username = :u"), {"u": username})
 
 
 def mint(admin_token, target, amount):

@@ -17,12 +17,13 @@ import os
 
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from tests.testdb import TEST_DATABASE_URL
 
 # Test database URL
-TEST_DATABASE_URL = "sqlite:///./test.db"
+TEST_DATABASE_URL = TEST_DATABASE_URL
 
 # Create test engine
-engine = create_engine(TEST_DATABASE_URL, connect_args={"check_same_thread": False})
+engine = create_engine(TEST_DATABASE_URL)
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
@@ -46,6 +47,7 @@ async def client():
     app.dependency_overrides[get_db] = override_get_db
 
     # Create tables
+    Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
 
     transport = ASGITransport(app=app)

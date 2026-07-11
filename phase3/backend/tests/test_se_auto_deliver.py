@@ -8,23 +8,24 @@
 """
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from tests.testdb import TEST_DATABASE_URL
 import pytest
 from datetime import datetime
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
 
 from models.database import Base, Task, Agent, TaskType, TaskStatus
 import services.se_pouw_flow as flow
 
 engine = create_engine(
-    "sqlite:///:memory:", connect_args={"check_same_thread": False}, poolclass=StaticPool
+    TEST_DATABASE_URL
 )
 TestingSessionLocal = sessionmaker(bind=engine)
 
 
 @pytest.fixture
 def db():
+    Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
     s = TestingSessionLocal()
     try:

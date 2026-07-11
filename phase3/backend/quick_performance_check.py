@@ -19,9 +19,11 @@ def check_database_indexes():
     print("="*60)
 
     try:
-        engine = create_engine("sqlite:///./nautilus.db")
+        from utils.database import engine
         with engine.connect() as conn:
-            result = conn.execute(text("SELECT name FROM sqlite_master WHERE type='index'"))
+            result = conn.execute(text(
+                "SELECT DISTINCT index_name FROM information_schema.statistics "
+                "WHERE table_schema = DATABASE()"))
             indexes = [row[0] for row in result]
 
         performance_indexes = [idx for idx in indexes if 'idx_' in idx]

@@ -10,15 +10,20 @@ from eth_account import Account
 from eth_account.messages import encode_defunct
 import secrets
 
+from tests.testdb import TEST_DATABASE_URL
 from main import app
 from models.database import Base, User, Agent
 from utils.database import get_db
 from utils.redis_cache import get_redis_cache
 
+# 钱包签名登录（GET /api/auth/nonce、POST /api/auth/wallet-register）已在私有化改造中
+# 移除，改用 JWT + 托管钱包；相关端点现返回 404。整文件跳过，功能恢复后再启用本测试。
+pytestmark = pytest.mark.skip(reason="钱包签名登录已移除，改用 JWT + 托管钱包，端点现 404")
+
 
 # Test database setup
-SQLALCHEMY_DATABASE_URL = "sqlite:///./test_wallet_auth.db"
-engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
+SQLALCHEMY_DATABASE_URL = TEST_DATABASE_URL
+engine = create_engine(SQLALCHEMY_DATABASE_URL)
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
@@ -37,6 +42,7 @@ app.dependency_overrides[get_db] = override_get_db
 @pytest.fixture(scope="function")
 def client():
     """Create test client."""
+    Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
     yield TestClient(app)
     Base.metadata.drop_all(bind=engine)

@@ -16,20 +16,14 @@ from sqlalchemy import create_engine
 def rebuild_test_database():
     """重建测试数据库"""
 
-    # 测试数据库路径
-    test_db_path = "test_nautilus.db"
+    print("🔧 重建测试数据库（MySQL nautilus_test）...")
 
-    print("🔧 重建测试数据库...")
-
-    # 删除旧数据库
-    if os.path.exists(test_db_path):
-        os.remove(test_db_path)
-        print(f"✅ 已删除旧数据库: {test_db_path}")
-
-    # 创建新数据库
-    engine = create_engine(f"sqlite:///{test_db_path}")
+    # 创建/重建 MySQL 测试库（先清后建）
+    from tests.testdb import TEST_DATABASE_URL
+    engine = create_engine(TEST_DATABASE_URL)
+    Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
-    print(f"✅ 已创建新数据库: {test_db_path}")
+    print(f"✅ 已重建测试库: {TEST_DATABASE_URL}")
 
     # 验证表结构
     from sqlalchemy import inspect
