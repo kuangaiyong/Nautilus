@@ -31,13 +31,13 @@ def get_tasks_cached(status: str = None, task_type: str = None, skip: int = 0, l
     # Build cache key without including the Session object
     cache_key = f"tasks:status={status}:type={task_type}:skip={skip}:limit={limit}"
 
-    # Check cache first
-    from utils.cache import redis_client
+    # Check cache first（SimpleCache 内部自动 Redis→内存 fallback，返回已反序列化对象）
+    from utils.cache import get_cache
+    cache = get_cache()
     try:
-        cached_result = redis_client.get(cache_key)
-        if cached_result:
-            import json
-            return json.loads(cached_result)
+        cached_result = cache.get(cache_key)
+        if cached_result is not None:
+            return cached_result
     except Exception as e:
         logger.warning(f"Cache lookup failed: {e}")
 
@@ -87,10 +87,9 @@ def get_tasks_cached(status: str = None, task_type: str = None, skip: int = 0, l
         ]
     }
 
-    # Cache the result (TTL 120 seconds)
+    # Cache the result (TTL 120 seconds；SimpleCache 内部序列化 + Redis/内存)
     try:
-        import json
-        redis_client.setex(cache_key, 120, json.dumps(result))
+        cache.set(cache_key, result, 120)
     except Exception as e:
         logger.warning(f"Failed to cache result: {e}")
 

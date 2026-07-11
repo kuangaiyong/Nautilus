@@ -296,11 +296,11 @@ async def list_tasks(
 
     **Example**: `GET /api/tasks?status=Open&task_type=CODE_DEVELOPMENT&limit=10`
     """
-    # Use cached task list query
-    result = await get_tasks_cached(status=status.value if status else None,
-                                    task_type=task_type.value if task_type else None,
-                                    skip=skip,
-                                    limit=limit, db=db)
+    # Use cached task list query（get_tasks_cached 是同步函数，不能 await）
+    result = get_tasks_cached(status=status.value if status else None,
+                              task_type=task_type.value if task_type else None,
+                              skip=skip,
+                              limit=limit, db=db)
     return result["tasks"]
 
 
