@@ -861,27 +861,28 @@ async def complete_task(
     # BEFORE marking the task completed, so a payment failure leaves the task
     # reviewable rather than silently "completed but unpaid". The publisher's
     # custodial wallet transfers the full 华币 reward to the agent (gasPrice 0).
-    from services.wallet import pay_hua_from_custodial, get_hua_balance
+    from services.wallet import pay_hua_from_custodial
+    from blockchain.web3_config import get_web3_config
 
     # Pre-check: Verify publisher has sufficient HUA balance before payment
     try:
-        publisher_balance = get_hua_balance(current_user.wallet_address)
-        if publisher_balance < task.reward:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail={"error": {
-                    "code": "INSUFFICIENT_HUA_BALANCE",
-                    "message": f"Publisher HUA balance {publisher_balance} wei < reward {task.reward} wei"
-                }},
-            )
+        web3_config = get_web3_config()
+        if web3_config.hua_contract:
+            publisher_balance_wei = int(web3_config.get_hua_balance(current_user.wallet_address) * (10 ** 18))
+            if publisher_balance_wei < task.reward:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail={"error": {
+                        "code": "INSUFFICIENT_HUA_BALANCE",
+                        "message": f"Publisher HUA balance {publisher_balance_wei} wei < reward {task.reward} wei"
+                    }},
+                )
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Failed to check publisher HUA balance for task {task_id}: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error": {"code": "BALANCE_CHECK_FAILED", "message": str(e)}},
-        )
+        # Don't fail if balance check is not available; let pay_hua_from_custodial validate
+        pass
 
     # Attempt payment
     try:
