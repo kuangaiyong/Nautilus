@@ -45,11 +45,20 @@ C:/nautilus-venv/Scripts/python.exe -m uvicorn main:app --host 127.0.0.1 --port 
 ```
 
 **私链是原生 geth**（非 Docker），位于 `C:\nautilus-privatechain`：5 个 Clique POA
-签名节点。node1 提供 RPC `:8545`（后端连这里），node2–5 提供 `:8547–8550`。用
-`start-geth.ps1`（node1）+ `start-nodes.ps1`（node2–5）启动。Clique 需要
-**≥3 个签名者在线且互联**，否则出块停滞（"signed recently, must wait for others"）；
-节点用 `--nodiscover`，所以启动后要手动互联（`admin_nodeInfo` → 对 node1
-`admin_addPeer`）。复用同一 datadir 可保留已部署的合约与余额。
+签名节点。node1 提供 RPC `:8545`（后端连这里），node2–5 提供 `:8547–8550`。
+启动用 **`start-all.ps1`**（幂等：起节点 → 等 RPC → 全网 addPeer → 验出块）；
+`start-geth.ps1` / `start-nodes.ps1` 是它的前身，节点表硬编码且不组网，已被取代。
+也可以直接在网页上启停（见下方「私链管理台」）。
+
+节点拓扑存在 **`C:\nautilus-privatechain\nodes.json`** —— `start-all.ps1` 与后端
+`/api/admin/chain` 共读的唯一注册表（网页上增删的节点重启机器后不会丢；文件不存在时
+后端首次调用会按默认 5 节点拓扑生成它）。**它不在 repo 里，做备份时别漏了。**
+
+Clique 的出块下限是 **`len(clique_getSigners()) // 2 + 1`**（推导值，不是常量：5 个签名者
+需 3 个、6 个需 4 个），在线签名者跌破它就整条链停止出块，后端所有华币结算随之失败。
+节点用 `--nodiscover` 且各 datadir 下**没有 `static-nodes.json`**，所以 **peering 是纯内存态**：
+任何节点重启后都必须重新 `admin_addPeer`，否则它进程活着、RPC 有响应、看着是绿的，
+却是 0 peer 的孤岛，已经悄悄掉出 quorum。复用同一 datadir 可保留已部署的合约与余额。
 
 前端：`cd phase3/website && npm run dev`，起在 **:3000**。vite 只把 `^/api/` 正则代理到
 后端 `:8000`（前缀写法 `/api` 会误代理 `/api-docs` 等前端路由）；vite 绑 `localhost`，
@@ -68,8 +77,11 @@ pytest，例如：
 ```bash
 C:/nautilus-venv/Scripts/python.exe tests/e2e_task_lifecycle.py   # 发布→抢单→实现→3专家评审→奖励
 C:/nautilus-venv/Scripts/python.exe tests/e2e_single_entry.py     # 唯一发布入口 + 新 SE 类型全流程（竞价→交付→评审→华币+NAU）
+C:/nautilus-venv/Scripts/python.exe tests/e2e_chain_admin.py      # 私链管理台：起链→华币上链→加节点→投票升签名者→压 quorum 验护栏→罢免→删节点
 C:/nautilus-venv/Scripts/python.exe tests/setup_test_accounts.py  # 准备 alice/bob + 管理员，充值华币
 ```
+`e2e_chain_admin.py` 会真的把链压到出块下限来证明护栏有效（这是唯一诚实的验证方式），
+收尾无条件跑一次幂等的 `/start` 恢复满编——即使中途断言失败也会执行。
 `pytest.ini` 设了 `asyncio_mode=auto` 和 `testpaths=tests`。**pytest 单测连独立的 MySQL
 `nautilus_test` 库**（`tests/testdb.py` 统一配置，`TEST_DATABASE_URL` 可覆盖），与运行库
 `nautilus_private` 物理隔离；各测试 fixture 用 `drop_all+create_all` 保证隔离（MySQL 物理库
@@ -106,6 +118,33 @@ C:/nautilus-venv/Scripts/python.exe tests/setup_test_accounts.py  # 准备 alice
 鉴权：`utils/auth.py` 的 JWT（`sub` = 用户名）或 API key；`get_current_user_or_agent`
 通过 `agent.owner == user.wallet_address` 把用户 token 解析为 `(user, agent)`。
 `main.py` 挂载约 48 个路由；tasks/agents/wallets/auth/survival 是核心。
+
+## 私链管理台（管理员专用，`api/chain_admin.py` + `services/chain_manager.py`）
+
+网页 `/admin/chain`（前端 `RequireAdmin` 守卫 + 菜单条件渲染）让管理员启停整条链、
+启停/增删单个节点、用 clique 投票选入/罢免签名者、看链与各节点实时状态。后端挂在
+`/api/admin/chain`，每个端点都过 `get_current_admin_user`。进程由 Python 直接起停
+（`subprocess.Popen` + psutil 按**监听端口反查 PID**，故不持久化 PID，后端重启会自动
+认领在跑的 geth，命令行起的节点也一样能管）；组网与签名者投票走 geth 的 HTTP RPC
+（`clique`/`admin`/`miner` 本就在每个节点的 `--http.api` 里）。
+
+四条硬约束（改这块前必读 `services/chain_manager.py` 头注释）：
+
+- **任何 start/restart 之后必须重跑 `mesh_peers()`** —— 见上文「peering 是纯内存态」。
+  状态接口的 `isolated` 字段就是用来暴露这种"绿着骗人"的节点的。
+- **enode 必须用 `admin_nodeInfo().enode` 原文**，不能从 `.id` 拼 —— `.id` 不是 enode
+  公钥，拼出来的 enode 会让 `addPeer` 返回 true 却永远连不上。
+- **node1 禁止单独停止/删除**（`RPC_ENTRY_NODE` 409）—— 它是 `.env` 里 `PRIVATE_RPC`
+  指的那个节点。停掉它链还在出块（剩 4 个签名者 ≥ 下限 3），但后端所有链上写入立刻全挂。
+  只有「停止整条链」（需 `{"confirm":"STOP"}`）能带走它。
+- **跌破出块下限一律硬拒**（`QUORUM_WOULD_BREAK` 409），不给 force 逃生口。
+
+变更类端点返回 `202 + op_id`（起链要 30~45 秒，clique 投票要等出块），前端轮询
+`GET /operations/{op_id}` 看进度与日志；护栏在拿到单写锁后**同步**跑完，所以护栏不通过
+是当场 409，不会先给一个注定失败的 op。`/status` 与 `/operations` 两个只读端点在
+`main.py` 里被 `limiter.exempt()` 从全局 `default_limits`（200/hour）豁免 —— slowapi 的
+middleware 对所有路由无条件套用 default_limits（路由级 `@limiter.limit` **覆盖不掉**，
+见 `slowapi/extension.py:614-633`），不豁免的话管理台秒级轮询十分钟就会把管理员自己 429 掉。
 
 ## 不显而易见的约定与坑
 

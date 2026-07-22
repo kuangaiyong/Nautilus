@@ -48,7 +48,7 @@
 | **项目代码** | `C:\code\Nautilus`（整个仓库，或 `git bundle`） | 含 `phase3/backend`、`phase3/website`、`phase3/contracts` |
 | **Python 3.11 安装包** | python.org 下载 `python-3.11.x-amd64.exe` | 后端 venv 需要；系统若已装 3.11 可跳过 |
 | **Node.js LTS 安装包** | nodejs.org 下载 `node-vXX-x64.msi`（建议 v18/20 LTS） | 前端 + 合约工具需要 |
-| **私有链整套** | 开发机整个 `C:\nautilus-privatechain` 目录 | **含 `bin\geth.exe` + 5 个节点 datadir + `genesis.json` + `start-*.ps1` + `password.txt`**。geth 二进制无法内网下载，datadir 保留了已部署合约与余额 |
+| **私有链整套** | 开发机整个 `C:\nautilus-privatechain` 目录 | **含 `bin\geth.exe` + 5 个节点 datadir + `genesis.json` + `nodes.json` + `start-*.ps1` + `password.txt`**。geth 二进制无法内网下载，datadir 保留了已部署合约与余额；`nodes.json` 是节点注册表（不在 repo 里，漏拷会退回默认 5 节点拓扑） |
 | **数据库导出**（策略 A） | 开发机执行 `mysqldump`（见 §四） | `nautilus_private.sql` |
 
 ### 目标机可内网下载（无需打包，但建议备好镜像源地址）
@@ -136,9 +136,13 @@ mysql -h <MYSQL_HOST> -u <USER> -p nautilus_private < nautilus_private.sql
 
 把开发机整个 `C:\nautilus-privatechain` 拷到目标机**相同路径** `C:\nautilus-privatechain`。
 
-> **强烈建议保持同路径 `C:\nautilus-privatechain`**：`start-all.ps1` 内部把该路径与各节点 datadir、`geth.exe`、
-> `password.txt` 硬编码在脚本里。若目标机必须换路径，需同步修改 `start-all.ps1` / `start-geth.ps1` /
-> `start-nodes.ps1` 里的 `$root` 变量。
+> **强烈建议保持同路径 `C:\nautilus-privatechain`**：`start-all.ps1` 把该路径写在 `$root` 里，`.env` 的
+> `CHAIN_ROOT` / `GETH_BIN` 也指向它。若目标机必须换路径，需同步改 `start-all.ps1`（以及已被取代的
+> `start-geth.ps1` / `start-nodes.ps1`）里的 `$root`，**并同步改 `.env` 的 `CHAIN_ROOT` / `GETH_BIN`**，
+> 否则 `/admin/chain` 管理台会 503。
+>
+> 节点拓扑（端口、datadir、签名者地址）由 `nodes.json` 描述，`start-all.ps1` 与后端管理台共读同一份，
+> 所以在网页上增删的节点，重启机器后依然生效。
 
 ### 2. 启动 5 节点并校验出块
 
@@ -212,6 +216,10 @@ LLM_MODEL=<内网模型名>
 BLOCKCHAIN_NETWORK=privatechain
 PRIVATE_RPC=http://127.0.0.1:8545
 PRIVATE_CHAIN_ID=13370
+# 私链运维台（/admin/chain）：节点注册表 nodes.json、genesis.json、password.txt
+# 都从 CHAIN_ROOT 推导。路径不存在时相关端点返回 503（不影响其余功能）。
+CHAIN_ROOT=C:\nautilus-privatechain
+GETH_BIN=C:\nautilus-privatechain\bin\geth.exe
 HUA_TOKEN_ADDRESS=0x5FbDB2315678afecb367f032d93F642f64180aa3
 NAU_TOKEN_ADDRESS=0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512
 REWARD_CONTRACT_ADDRESS=0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0
@@ -407,6 +415,7 @@ npx hardhat run scripts\deploy_private.js --network privatechain      # 华币/N
 | 缓存 | `REDIS_HOST/PORT/DB/PASSWORD`、`REDIS_URL` | **改**为内网 Redis，`REDIS_URL` 带 `?protocol=2`，`REDIS_DB=3` |
 | LLM | `LLM_BASE_URL/API_KEY/MODEL` | **改**为内网私有化大模型（OpenAI 兼容） |
 | 链 | `BLOCKCHAIN_NETWORK=privatechain`、`PRIVATE_RPC`、`PRIVATE_CHAIN_ID=13370` | 保持 |
+| 链运维 | `CHAIN_ROOT`、`GETH_BIN` | 改为目标机上私链目录与 geth 路径；`/admin/chain` 管理台用 |
 | 合约地址 | `HUA/NAU/REWARD/TASK/IDENTITY/WALLET_REGISTRY/AUDIT_TRAIL_ADDRESS` | 整体迁移保持；全新部署回填新地址 |
 | 链私钥 | `SIGNER/BLOCKCHAIN/DEPLOYER_PRIVATE_KEY` | 整体迁移保持 |
 | 机密 | `WALLET_MASTER_KEY` | 整体迁移**必须保持不变**；全新可生成 |

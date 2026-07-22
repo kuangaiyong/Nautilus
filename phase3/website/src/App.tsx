@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
 import Layout from './components/layout/Layout'
 import ProtectedRoute from './components/auth/ProtectedRoute'
+import RequireAdmin from './components/auth/RequireAdmin'
 
 const Home = lazy(() => import('./pages/Home'))
 const Login = lazy(() => import('./pages/Login'))
@@ -12,6 +13,7 @@ const AgentRegisterPageV2 = lazy(() => import('./pages/AgentRegisterPageV2'))
 const AgentLoginPageV2 = lazy(() => import('./pages/AgentLoginPageV2'))
 const CreateWalletPage = lazy(() => import('./pages/CreateWalletPage'))
 const AdminMintPage = lazy(() => import('./pages/AdminMintPage'))
+const AdminChainPage = lazy(() => import('./pages/AdminChainPage'))
 const FeaturesPage = lazy(() => import('./pages/FeaturesPage'))
 const PricingPage = lazy(() => import('./pages/PricingPage'))
 const DocumentationPage = lazy(() => import('./pages/DocumentationPage'))
@@ -56,6 +58,7 @@ function App() {
               <Route path="/agent/login" element={<AgentLoginPageV2 />} />
               <Route path="/create-wallet" element={<CreateWalletPage />} />
               <Route path="/admin/mint" element={<AdminMintPage />} />
+              <Route path="/admin/chain" element={<RequireAdmin><AdminChainPage /></RequireAdmin>} />
               <Route path="/features" element={<FeaturesPage />} />
               <Route path="/pricing" element={<PricingPage />} />
               <Route path="/docs" element={<DocumentationPage />} />

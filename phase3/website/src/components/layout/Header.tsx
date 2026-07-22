@@ -95,6 +95,15 @@ export default function Header() {
                         管理员发币
                       </Link>
                     )}
+                    {user?.is_admin && (
+                      <Link
+                        to="/admin/chain"
+                        className="block px-4 py-2 text-gray-800 hover:bg-gray-100"
+                        onClick={() => setIsUserMenuOpen(false)}
+                      >
+                        私链管理
+                      </Link>
+                    )}
                     <div className="my-1 border-t border-gray-100" />
                     <Link
                       to="/profile"
@@ -206,6 +215,14 @@ export default function Header() {
                     className="block hover:text-primary-400 transition"
                   >
                     管理员发币
+                  </Link>
+                )}
+                {user?.is_admin && (
+                  <Link
+                    to="/admin/chain"
+                    className="block hover:text-primary-400 transition"
+                  >
+                    私链管理
                   </Link>
                 )}
                 <Link

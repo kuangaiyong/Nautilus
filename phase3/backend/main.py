@@ -51,6 +51,7 @@ from api.marketplace import router as marketplace_router
 from api.marketplace import task_router as marketplace_task_router
 from api.partner_api import router as partner_api_router
 from api.partner_admin import router as partner_admin_router
+from api.chain_admin import router as chain_admin_router, RATE_LIMIT_EXEMPT as chain_admin_exempt
 import models.partner  # noqa: F401 - ensure partner tables are created
 import models.conversation  # noqa: F401 - ensure conversation tables are created
 from api.wechat_bot import router as wechat_router
@@ -552,6 +553,12 @@ app.include_router(marketplace_router, prefix="/api/marketplace", tags=["Marketp
 app.include_router(marketplace_task_router, tags=["Task Bidding Marketplace"])
 app.include_router(partner_api_router, prefix="/api/v1", tags=["Partner API"])
 app.include_router(partner_admin_router, prefix="/api/admin/partners", tags=["Partner Admin"])
+app.include_router(chain_admin_router, prefix="/api/admin/chain", tags=["Chain Admin"])
+# 私链管理台要秒级轮询链状态/操作进度，而 SlowAPIMiddleware 对所有路由无条件套用
+# default_limits（200/hour，路由级 @limiter.limit 覆盖不掉），十分钟就会把管理员自己 429 掉。
+# 只豁免这两个只读端点；变更类端点不豁免，仍受全局限流 + chain_manager 的单写锁约束。
+for _chain_endpoint in chain_admin_exempt:
+    limiter.exempt(_chain_endpoint)
 app.include_router(wechat_router, tags=["WeChat Bot"])
 app.include_router(upload_router, prefix="/api/upload", tags=["File Upload"])
 app.include_router(telegram_router, tags=["Telegram Bot"])
